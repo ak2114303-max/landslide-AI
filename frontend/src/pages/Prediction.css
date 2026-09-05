@@ -1,0 +1,452 @@
+
+.prediction-page {
+  min-height: 100vh;
+  padding: 50px;
+  background: #f6f8f5;
+  color: #1f2a24;
+  box-sizing: border-box;
+}
+
+/* Header */
+
+.prediction-header {
+  max-width: 900px;
+  margin: 0 auto 35px;
+}
+
+.prediction-header p {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #6b7d6f;
+  margin-bottom: 10px;
+}
+
+.prediction-header h1 {
+  font-size: 42px;
+  margin: 0 0 12px;
+}
+
+.prediction-header span {
+  color: #68756c;
+  font-size: 16px;
+}
+
+/* Back button */
+
+.back-dashboard-button {
+  margin-bottom: 22px;
+  padding: 9px 14px;
+  border: 1px solid #d6ddd8;
+  border-radius: 9px;
+  background: white;
+  color: #26352b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-dashboard-button:hover {
+  background: #eef3ef;
+  border-color: #6d8b73;
+  transform: translateY(-1px);
+}
+
+/* Prediction input card */
+
+.prediction-card {
+  max-width: 900px;
+  margin: auto;
+  background: white;
+  padding: 35px;
+  border-radius: 20px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  box-sizing: border-box;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-group label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.input-group input {
+  padding: 13px 14px;
+  border: 1px solid #d9dfda;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-group input:focus {
+  border-color: #6d8b73;
+  box-shadow: 0 0 0 3px rgba(109, 139, 115, 0.12);
+}
+
+/* Main prediction button */
+
+.prediction-card button {
+  grid-column: 1 / -1;
+  padding: 15px;
+  border: none;
+  border-radius: 10px;
+  background: #26352b;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.prediction-card button:hover {
+  background: #3b5142;
+  transform: translateY(-1px);
+}
+
+.prediction-card button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Reset button */
+
+.prediction-card .reset-button {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border: 1px solid #cfd8d1;
+  border-radius: 10px;
+  background: white;
+  color: #26352b;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prediction-card .reset-button:hover {
+  background: #f1f4f1;
+  transform: none;
+}
+
+/* Prediction result */
+
+.prediction-result {
+  max-width: 900px;
+  margin: 30px auto 0;
+  padding: 35px;
+  background: white;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+}
+
+.prediction-result > p {
+  color: #6b7d6f;
+  font-weight: 600;
+}
+
+.prediction-result h2 {
+  font-size: 56px;
+  margin: 10px 0;
+}
+
+.prediction-result h3 {
+  font-size: 26px;
+  margin: 0 0 10px;
+}
+
+.prediction-result > span {
+  color: #68756c;
+}
+
+/* Risk meter */
+
+.risk-meter {
+  width: 100%;
+  height: 14px;
+  background: #e5e9e6;
+  border-radius: 20px;
+  overflow: hidden;
+  margin: 20px 0;
+}
+
+.risk-meter-fill {
+  height: 100%;
+  background: #d64545;
+  border-radius: 20px;
+  transition: width 0.8s ease;
+}
+
+.prediction-result.low .risk-meter-fill {
+  background: #4caf50;
+}
+
+.prediction-result.moderate .risk-meter-fill {
+  background: #e0b43c;
+}
+
+.prediction-result.high .risk-meter-fill {
+  background: #e67e22;
+}
+
+.prediction-result.critical .risk-meter-fill {
+  background: #d64545;
+}
+
+/* Recommendation */
+
+.risk-recommendation {
+  margin-top: 25px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #f7faf8;
+  border: 1px solid #e1e7e3;
+  text-align: left;
+}
+
+.risk-recommendation h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.risk-recommendation p {
+  margin: 0;
+  color: #536159;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Explainable AI */
+
+.ai-explanation {
+  margin-top: 30px;
+  padding: 24px;
+  border: 1px solid #dce5df;
+  border-radius: 16px;
+  background: #f8fbf9;
+  text-align: left;
+}
+
+.explanation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.explanation-header p {
+  margin: 0 0 5px;
+  color: #2f8f5b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+
+.explanation-header h4 {
+  margin: 0;
+  font-size: 20px;
+  color: #1f2a24;
+}
+
+.explanation-header > span {
+  padding: 7px 10px;
+  border-radius: 20px;
+  background: #e7f3eb;
+  color: #2f8f5b;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.explanation-intro {
+  margin: 0 0 18px;
+  color: #68756c;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Risk factor cards */
+
+.risk-factor-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.risk-factor {
+  padding: 15px;
+  background: white;
+  border: 1px solid #e1e7e3;
+  border-left: 4px solid #6d8b73;
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.risk-factor.high {
+  border-left-color: #d64545;
+}
+
+.risk-factor.moderate {
+  border-left-color: #e0b43c;
+}
+
+.risk-factor.low {
+  border-left-color: #4caf50;
+}
+
+.factor-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.factor-top strong {
+  font-size: 14px;
+  color: #26352b;
+}
+
+.factor-top span {
+  color: #68756c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.factor-impact {
+  display: inline-block;
+  margin-top: 9px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.risk-factor.high .factor-impact {
+  background: #fdeaea;
+  color: #c62828;
+}
+
+.risk-factor.moderate .factor-impact {
+  background: #fff8e1;
+  color: #a67c00;
+}
+
+.risk-factor.low .factor-impact {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.risk-factor p {
+  margin: 9px 0 0;
+  color: #68756c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Environmental conditions */
+
+.prediction-factors {
+  margin-top: 30px;
+  padding-top: 25px;
+  border-top: 1px solid #e1e6e2;
+  text-align: left;
+}
+
+.prediction-factors h4 {
+  margin: 0 0 18px;
+  font-size: 18px;
+}
+
+.factor-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.factor-grid > div {
+  padding: 15px;
+  background: #f6f8f5;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.factor-grid span {
+  font-size: 13px;
+  color: #68756c;
+}
+
+.factor-grid strong {
+  font-size: 16px;
+}
+
+/* Responsive */
+
+@media (max-width: 800px) {
+  .prediction-page {
+    padding: 30px;
+  }
+
+  .factor-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .risk-factor-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .prediction-page {
+    padding: 25px;
+  }
+
+  .prediction-header h1 {
+    font-size: 32px;
+  }
+
+  .prediction-card {
+    grid-template-columns: 1fr;
+    padding: 25px;
+  }
+
+  .explanation-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .explanation-header > span {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 500px) {
+  .prediction-page {
+    padding: 18px;
+  }
+
+  .prediction-result {
+    padding: 22px;
+  }
+
+  .prediction-result h2 {
+    font-size: 46px;
+  }
+
+  .factor-grid {
+    grid-template-columns: 1fr;
+  }
+}

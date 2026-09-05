@@ -1,0 +1,250 @@
+
+.scenario-page {
+  min-height: 100vh;
+  padding: 50px;
+  background: #f6f8f5;
+  color: #1f2a24;
+}
+
+/* Header */
+
+.scenario-header {
+  max-width: 900px;
+  margin: 0 auto 20px;
+}
+
+.scenario-header p {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #6b7d6f;
+  margin-bottom: 10px;
+}
+
+.scenario-header h1 {
+  font-size: 42px;
+  margin: 0 0 12px;
+}
+
+.scenario-header span {
+  color: #68756c;
+  font-size: 16px;
+}
+
+.scenario-header h3 {
+  margin-top: 18px;
+  margin-bottom: 0;
+  font-size: 18px;
+  color: #3b5142;
+}
+
+/* Back Button */
+
+.scenario-back-button {
+  display: block;
+  max-width: 900px;
+  margin: 0 auto 20px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 9px;
+  background: #e7ece8;
+  color: #26352b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scenario-back-button:hover {
+  background: #d8e0da;
+}
+
+/* Scenario Input Card */
+
+.scenario-card {
+  max-width: 900px;
+  margin: auto;
+  background: white;
+  padding: 35px;
+  border-radius: 20px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.scenario-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scenario-input label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.scenario-input input {
+  padding: 13px 14px;
+  border: 1px solid #d9dfda;
+  border-radius: 10px;
+  font-size: 15px;
+  outline: none;
+}
+
+.scenario-input input:focus {
+  border-color: #6d8b73;
+}
+
+/* Buttons */
+
+.scenario-card button {
+  grid-column: 1 / -1;
+
+  padding: 15px;
+  border: none;
+  border-radius: 10px;
+
+  background: #26352b;
+  color: white;
+
+  font-size: 16px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.scenario-card button:hover {
+  background: #3b5142;
+}
+
+.scenario-card button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Result */
+
+.scenario-result {
+  max-width: 900px;
+  margin: 30px auto 0;
+
+  padding: 35px;
+
+  background: white;
+  border-radius: 20px;
+
+  text-align: center;
+
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+}
+
+.scenario-result p {
+  color: #6b7d6f;
+  font-weight: 600;
+}
+
+.scenario-result h2 {
+  font-size: 56px;
+  margin: 10px 0;
+}
+
+.scenario-result h3 {
+  font-size: 26px;
+  margin: 0 0 10px;
+}
+
+.scenario-result span {
+  color: #68756c;
+}
+
+/* Risk Level Colors */
+
+.scenario-result.low h3 {
+  color: #4caf50;
+}
+
+.scenario-result.moderate h3 {
+  color: #e0b43c;
+}
+
+.scenario-result.high h3 {
+  color: #e67e22;
+}
+
+.scenario-result.critical h3 {
+  color: #d64545;
+}
+
+/* Baseline Risk */
+
+.baseline-risk {
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+.baseline-risk strong {
+  color: #26352b;
+}
+
+/* Risk Change */
+
+.risk-change {
+  margin: 12px 0 18px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.risk-change.decrease {
+  color: #2e7d32;
+}
+
+.risk-change.increase {
+  color: #c62828;
+}
+
+.risk-change.same {
+  color: #68756c;
+}
+
+/* Mobile */
+
+@media (max-width: 700px) {
+  .scenario-page {
+    padding: 25px;
+  }
+
+  .scenario-header h1 {
+    font-size: 32px;
+  }
+
+  .scenario-card {
+    grid-template-columns: 1fr;
+    padding: 25px;
+  }
+}
+.scenario-reset-button {
+  grid-column: 1 / -1;
+
+  padding: 13px;
+
+  border: 1px solid #d9dfda;
+  border-radius: 10px;
+
+  background: #f1f4f2;
+  color: #26352b;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.scenario-reset-button:hover {
+  background: #e3e9e5;
+}
+
+.scenario-reset-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

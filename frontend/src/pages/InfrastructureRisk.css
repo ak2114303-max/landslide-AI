@@ -1,0 +1,282 @@
+.infrastructure-page {
+  min-height: 100vh;
+  padding: 30px;
+  background: #f5f7fa;
+}
+
+.infrastructure-header {
+  max-width: 1200px;
+  margin: 0 auto 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.infrastructure-label {
+  color: #d64545;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.infrastructure-header h1 {
+  margin: 6px 0;
+  font-size: 32px;
+  color: #1f2937;
+}
+
+.infrastructure-header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.back-button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #1f2937;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.back-button:hover {
+  opacity: 0.9;
+}
+
+.infrastructure-summary {
+  max-width: 1200px;
+  margin: 0 auto 25px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.infra-stat {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  border-left: 5px solid #64748b;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+.infra-stat strong {
+  display: block;
+  font-size: 28px;
+  color: #1f2937;
+}
+
+.infra-stat span {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.infra-stat.critical {
+  border-left-color: #d64545;
+}
+
+.infra-stat.high {
+  border-left-color: #e67e22;
+}
+
+.infra-stat.safe {
+  border-left-color: #e0b43c;
+}
+
+.infrastructure-card {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+.infrastructure-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.infrastructure-card-header h2 {
+  margin: 0 0 5px;
+  color: #1f2937;
+}
+
+.infrastructure-card-header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.monitoring-badge {
+  color: #15803d;
+  background: #dcfce7;
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.infrastructure-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.infrastructure-row {
+  display: grid;
+  grid-template-columns: 1.8fr 0.7fr 0.8fr 1.2fr;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-left: 5px solid #64748b;
+  border-radius: 10px;
+}
+
+.infrastructure-row.critical {
+  border-left-color: #d64545;
+}
+
+.infrastructure-row.high {
+  border-left-color: #e67e22;
+}
+
+.infrastructure-row.moderate {
+  border-left-color: #e0b43c;
+}
+
+.infra-main h3 {
+  margin: 0 0 7px;
+  color: #1f2937;
+  font-size: 17px;
+}
+
+.infra-details {
+  display: flex;
+  gap: 10px;
+}
+
+.infra-details span {
+  padding: 4px 9px;
+  background: #f3f4f6;
+  border-radius: 5px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.infra-score strong {
+  font-size: 28px;
+  color: #1f2937;
+}
+
+.infra-score span {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.infra-risk {
+  width: fit-content;
+  padding: 7px 13px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.infra-risk.critical {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.infra-risk.high {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.infra-risk.moderate {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.infra-risk.low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.infra-status {
+  padding: 7px 11px;
+  border-radius: 7px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.infra-status.immediate-attention {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.infra-status.monitoring {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.infra-status.normal {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.infrastructure-note {
+  max-width: 1200px;
+  margin: 18px auto 0;
+  padding: 15px 18px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 950px) {
+  .infrastructure-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .infrastructure-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .infrastructure-page {
+    padding: 15px;
+  }
+
+  .infrastructure-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .infrastructure-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .infrastructure-card {
+    padding: 16px;
+  }
+
+  .infrastructure-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .infrastructure-row {
+    grid-template-columns: 1fr;
+  }
+}
