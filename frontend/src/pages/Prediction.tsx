@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -7,22 +6,40 @@ import "./Prediction.css";
 interface PredictionResult {
   risk_score: number;
   risk_level: string;
+  model_name: string;
+  feature_importance: {
+    rainfall_mm: number;
+    soil_moisture: number;
+    slope_degree: number;
+    elevation_m: number;
+    temperature_c: number;
+  };
+}
+
+interface RiskFactor {
+  name: string;
+  value: string;
+  importance: number;
+  description: string;
 }
 
 function Prediction() {
   const navigate = useNavigate();
 
+  // Input values
   const [rainfall, setRainfall] = useState("");
   const [soilMoisture, setSoilMoisture] = useState("");
   const [slope, setSlope] = useState("");
   const [elevation, setElevation] = useState("");
   const [temperature, setTemperature] = useState("");
 
-  const [result, setResult] =
-    useState<PredictionResult | null>(null);
+  // Prediction result
+  const [result, setResult] = useState<PredictionResult | null>(null);
 
+  // Loading state
   const [loading, setLoading] = useState(false);
 
+  // Reset form
   const resetForm = () => {
     setRainfall("");
     setSoilMoisture("");
@@ -32,6 +49,7 @@ function Prediction() {
     setResult(null);
   };
 
+  // Predict landslide risk
   const predictRisk = async () => {
     if (
       !rainfall ||
@@ -68,6 +86,7 @@ function Prediction() {
     }
   };
 
+  // Recommendation based on risk level
   const getRecommendation = (riskLevel: string) => {
     if (riskLevel === "Critical") {
       return "⚠️ Immediate monitoring and preventive action are recommended.";
@@ -84,137 +103,61 @@ function Prediction() {
     return "🟢 Current conditions appear relatively stable.";
   };
 
-  /* AI explanation */
+  // Get risk color class
+  const getRiskClass = (riskLevel: string) => {
+    return riskLevel.toLowerCase();
+  };
 
-  const getRiskFactors = () => {
-    const factors: {
-      name: string;
-      value: string;
-      impact: string;
-      description: string;
-      level: string;
-    }[] = [];
-
-    const rainfallValue = Number(rainfall);
-    const moistureValue = Number(soilMoisture);
-    const slopeValue = Number(slope);
-    const elevationValue = Number(elevation);
-
-    if (rainfallValue >= 200) {
-      factors.push({
-        name: "Rainfall",
-        value: `${rainfallValue} mm`,
-        impact: "High Impact",
-        description:
-          "Heavy rainfall can increase soil saturation and slope instability.",
-        level: "high",
-      });
-    } else if (rainfallValue >= 100) {
-      factors.push({
-        name: "Rainfall",
-        value: `${rainfallValue} mm`,
-        impact: "Moderate Impact",
-        description:
-          "Moderate rainfall may increase soil moisture and landslide susceptibility.",
-        level: "moderate",
-      });
-    } else {
-      factors.push({
-        name: "Rainfall",
-        value: `${rainfallValue} mm`,
-        impact: "Low Impact",
-        description:
-          "Lower rainfall generally reduces rainfall-related slope instability.",
-        level: "low",
-      });
+  // Convert feature importance into readable values
+  const getRiskFactors = (): RiskFactor[] => {
+    if (!result) {
+      return [];
     }
 
-    if (moistureValue >= 80) {
-      factors.push({
-        name: "Soil Moisture",
-        value: `${moistureValue}%`,
-        impact: "High Impact",
-        description:
-          "Highly saturated soil can reduce slope stability.",
-        level: "high",
-      });
-    } else if (moistureValue >= 60) {
-      factors.push({
-        name: "Soil Moisture",
-        value: `${moistureValue}%`,
-        impact: "Moderate Impact",
-        description:
-          "Moderate soil moisture indicates increased water content in the ground.",
-        level: "moderate",
-      });
-    } else {
-      factors.push({
-        name: "Soil Moisture",
-        value: `${moistureValue}%`,
-        impact: "Low Impact",
-        description:
-          "Lower soil moisture generally indicates better ground stability.",
-        level: "low",
-      });
-    }
+    const importance = result.feature_importance;
 
-    if (slopeValue >= 40) {
-      factors.push({
-        name: "Slope",
-        value: `${slopeValue}°`,
-        impact: "High Impact",
+    return [
+      {
+        name: "Rainfall",
+        value: `${rainfall} mm`,
+        importance: importance.rainfall_mm,
         description:
-          "Steep slopes are generally more susceptible to gravitational failure.",
-        level: "high",
-      });
-    } else if (slopeValue >= 25) {
-      factors.push({
-        name: "Slope",
-        value: `${slopeValue}°`,
-        impact: "Moderate Impact",
+          "Rainfall can increase soil saturation and reduce slope stability.",
+      },
+      {
+        name: "Soil Moisture",
+        value: `${soilMoisture}%`,
+        importance: importance.soil_moisture,
         description:
-          "Moderately steep terrain can contribute to slope instability.",
-        level: "moderate",
-      });
-    } else {
-      factors.push({
+          "Higher soil moisture can increase saturation and landslide susceptibility.",
+      },
+      {
         name: "Slope",
-        value: `${slopeValue}°`,
-        impact: "Low Impact",
+        value: `${slope}°`,
+        importance: importance.slope_degree,
         description:
-          "Gentler slopes generally have lower gravitational instability.",
-        level: "low",
-      });
-    }
-
-    if (elevationValue >= 2000) {
-      factors.push({
+          "Steeper slopes generally have greater gravitational instability.",
+      },
+      {
         name: "Elevation",
-        value: `${elevationValue} m`,
-        impact: "Moderate Impact",
+        value: `${elevation} m`,
+        importance: importance.elevation_m,
         description:
-          "High-elevation mountainous terrain can experience challenging environmental conditions.",
-        level: "moderate",
-      });
-    } else {
-      factors.push({
-        name: "Elevation",
-        value: `${elevationValue} m`,
-        impact: "Low Impact",
+          "Elevation represents the mountainous terrain conditions used by the model.",
+      },
+      {
+        name: "Temperature",
+        value: `${temperature}°C`,
+        importance: importance.temperature_c,
         description:
-          "The entered elevation has a relatively lower contribution in this prototype.",
-        level: "low",
-      });
-    }
-
-    return factors;
+          "Temperature is included as an environmental feature in the prediction model.",
+      },
+    ];
   };
 
   return (
     <div className="prediction-page">
-
       {/* Header */}
-
       <div className="prediction-header">
         <button
           type="button"
@@ -234,135 +177,224 @@ function Prediction() {
       </div>
 
       {/* Input Card */}
-
       <div className="prediction-card">
+        <div className="prediction-card-header">
+          <div>
+            <p>ENVIRONMENTAL INPUTS</p>
+            <h2>Enter Location Conditions</h2>
+          </div>
 
-        <div className="input-group">
-          <label>Rainfall (mm)</label>
-          <input
-            type="number"
-            min="0"
-            max="1000"
-            value={rainfall}
-            onChange={(e) => setRainfall(e.target.value)}
-            placeholder="Example: 240"
-          />
+          <span className="ai-badge">AI MODEL</span>
         </div>
 
-        <div className="input-group">
-          <label>Soil Moisture (%)</label>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            value={soilMoisture}
-            onChange={(e) => setSoilMoisture(e.target.value)}
-            placeholder="Example: 86"
-          />
+        <div className="prediction-form">
+          {/* Rainfall */}
+          <div className="input-group">
+            <label htmlFor="rainfall">
+              Rainfall
+              <span>mm</span>
+            </label>
+
+            <input
+              id="rainfall"
+              type="number"
+              placeholder="e.g. 180"
+              value={rainfall}
+              onChange={(e) => setRainfall(e.target.value)}
+            />
+          </div>
+
+          {/* Soil Moisture */}
+          <div className="input-group">
+            <label htmlFor="soil-moisture">
+              Soil Moisture
+              <span>%</span>
+            </label>
+
+            <input
+              id="soil-moisture"
+              type="number"
+              placeholder="e.g. 70"
+              value={soilMoisture}
+              onChange={(e) => setSoilMoisture(e.target.value)}
+            />
+          </div>
+
+          {/* Slope */}
+          <div className="input-group">
+            <label htmlFor="slope">
+              Slope
+              <span>degrees</span>
+            </label>
+
+            <input
+              id="slope"
+              type="number"
+              placeholder="e.g. 35"
+              value={slope}
+              onChange={(e) => setSlope(e.target.value)}
+            />
+          </div>
+
+          {/* Elevation */}
+          <div className="input-group">
+            <label htmlFor="elevation">
+              Elevation
+              <span>meters</span>
+            </label>
+
+            <input
+              id="elevation"
+              type="number"
+              placeholder="e.g. 2000"
+              value={elevation}
+              onChange={(e) => setElevation(e.target.value)}
+            />
+          </div>
+
+          {/* Temperature */}
+          <div className="input-group">
+            <label htmlFor="temperature">
+              Temperature
+              <span>°C</span>
+            </label>
+
+            <input
+              id="temperature"
+              type="number"
+              placeholder="e.g. 18"
+              value={temperature}
+              onChange={(e) => setTemperature(e.target.value)}
+            />
+          </div>
         </div>
 
-        <div className="input-group">
-          <label>Slope (degrees)</label>
-          <input
-            type="number"
-            min="0"
-            max="90"
-            value={slope}
-            onChange={(e) => setSlope(e.target.value)}
-            placeholder="Example: 45"
-          />
+        {/* Buttons */}
+        <div className="prediction-actions">
+          <button
+            type="button"
+            className="predict-button"
+            onClick={predictRisk}
+            disabled={loading}
+          >
+            {loading ? "Analyzing..." : "Predict Landslide Risk →"}
+          </button>
+
+          <button
+            type="button"
+            className="reset-button"
+            onClick={resetForm}
+          >
+            Reset
+          </button>
         </div>
-
-        <div className="input-group">
-          <label>Elevation (m)</label>
-          <input
-            type="number"
-            min="0"
-            max="9000"
-            value={elevation}
-            onChange={(e) => setElevation(e.target.value)}
-            placeholder="Example: 2050"
-          />
-        </div>
-
-        <div className="input-group">
-          <label>Temperature (°C)</label>
-          <input
-            type="number"
-            min="-50"
-            max="60"
-            value={temperature}
-            onChange={(e) => setTemperature(e.target.value)}
-            placeholder="Example: 15"
-          />
-        </div>
-
-        <button
-          onClick={predictRisk}
-          disabled={loading}
-        >
-          {loading ? "Analyzing..." : "Predict Landslide Risk"}
-        </button>
-
-        <button
-          type="button"
-          className="reset-button"
-          onClick={resetForm}
-          disabled={loading}
-        >
-          Reset
-        </button>
       </div>
 
       {/* Prediction Result */}
-
       {result && (
         <div
-          className={`prediction-result ${result.risk_level.toLowerCase()}`}
+          className={`prediction-result ${getRiskClass(
+            result.risk_level
+          )}`}
         >
+          {/* Result Header */}
+          <div className="result-header">
+            <div>
+              <p>AI PREDICTION RESULT</p>
 
-          <p>AI Prediction Result</p>
+              <h2>Landslide Risk Assessment</h2>
+            </div>
 
-          {/* Risk Meter */}
-
-          <div className="risk-meter">
-            <div
-              className="risk-meter-fill"
-              style={{
-                width: `${Math.min(
-                  Math.max(result.risk_score, 0),
-                  100
-                )}%`,
-              }}
-            ></div>
+            <div className="risk-level-badge">
+              {result.risk_level}
+            </div>
           </div>
 
-          <h2>{result.risk_score}%</h2>
+          {/* Risk Score */}
+          <div className="risk-score-section">
+            <div className="risk-score-value">
+              {Number(result.risk_score).toFixed(1)}
+            </div>
 
-          <h3>{result.risk_level} Risk</h3>
+            <div className="risk-score-label">
+              Risk Score
+              <span>out of 100</span>
+            </div>
+          </div>
 
-          <span>
-            The AI model has analyzed the environmental conditions
-            and estimated the current landslide risk.
-          </span>
+          {/* Risk Meter */}
+          <div className="risk-meter">
+            <div className="risk-meter-labels">
+              <span>Low</span>
+              <span>Moderate</span>
+              <span>High</span>
+              <span>Critical</span>
+            </div>
+
+            <div className="risk-meter-track">
+              <div
+                className="risk-meter-fill"
+                style={{
+                  width: `${Math.min(
+                    Math.max(Number(result.risk_score), 0),
+                    100
+                  )}%`,
+                }}
+              ></div>
+            </div>
+          </div>
 
           {/* Recommendation */}
+          <div className="recommendation-box">
+            <p>RECOMMENDATION</p>
 
-          <div className="risk-recommendation">
-            <h4>Recommendation</h4>
-
-            <p>
+            <h3>
               {getRecommendation(result.risk_level)}
-            </p>
+            </h3>
+          </div>
+
+          {/* Environmental Conditions */}
+          <div className="result-conditions">
+            <div className="conditions-header">
+              <p>ENVIRONMENTAL CONDITIONS</p>
+
+              <h3>Input Values Used by AI</h3>
+            </div>
+
+            <div className="condition-grid">
+              <div className="condition-item">
+                <span>Rainfall</span>
+                <strong>{rainfall} mm</strong>
+              </div>
+
+              <div className="condition-item">
+                <span>Soil Moisture</span>
+                <strong>{soilMoisture}%</strong>
+              </div>
+
+              <div className="condition-item">
+                <span>Slope</span>
+                <strong>{slope}°</strong>
+              </div>
+
+              <div className="condition-item">
+                <span>Elevation</span>
+                <strong>{elevation} m</strong>
+              </div>
+
+              <div className="condition-item">
+                <span>Temperature</span>
+                <strong>{temperature}°C</strong>
+              </div>
+            </div>
           </div>
 
           {/* Explainable AI */}
-
           <div className="ai-explanation">
-
             <div className="explanation-header">
               <div>
                 <p>AI EXPLANATION</p>
+
                 <h4>Why is this risk predicted?</h4>
               </div>
 
@@ -370,70 +402,66 @@ function Prediction() {
             </div>
 
             <p className="explanation-intro">
-              The prediction is influenced by the environmental
-              conditions entered above. Higher rainfall, soil moisture,
-              and slope can increase landslide susceptibility.
+              The model uses five environmental features to estimate
+landslide risk. The percentages below show the relative
+importance of each feature in the trained {result.model_name} model.
             </p>
 
             <div className="risk-factor-list">
-              {getRiskFactors().map((factor) => (
-                <div
-                  className={`risk-factor ${factor.level}`}
-                  key={factor.name}
-                >
-                  <div className="factor-top">
-                    <strong>{factor.name}</strong>
+              {getRiskFactors()
+                .sort((a, b) => b.importance - a.importance)
+                .map((factor) => (
+                  <div
+                    className="risk-factor"
+                    key={factor.name}
+                  >
+                    <div className="factor-top">
+                      <strong>{factor.name}</strong>
 
-                    <span>{factor.value}</span>
+                      <span>{factor.value}</span>
+                    </div>
+
+                    <div className="factor-impact">
+                      Model Importance:{" "}
+                      {(factor.importance * 100).toFixed(2)}%
+                    </div>
+
+                    <div className="importance-bar">
+                      <div
+                        className="importance-bar-fill"
+                        style={{
+                          width: `${Math.min(
+                            factor.importance * 100,
+                            100
+                          )}%`,
+                        }}
+                      ></div>
+                    </div>
+
+                    <p>{factor.description}</p>
                   </div>
-
-                  <div className="factor-impact">
-                    {factor.impact}
-                  </div>
-
-                  <p>{factor.description}</p>
-                </div>
-              ))}
-            </div>
-
-          </div>
-
-          {/* Environmental Factors */}
-
-          <div className="prediction-factors">
-
-            <h4>Environmental Conditions</h4>
-
-            <div className="factor-grid">
-
-              <div>
-                <span>🌧️ Rainfall</span>
-                <strong>{rainfall} mm</strong>
-              </div>
-
-              <div>
-                <span>💧 Soil Moisture</span>
-                <strong>{soilMoisture}%</strong>
-              </div>
-
-              <div>
-                <span>⛰️ Slope</span>
-                <strong>{slope}°</strong>
-              </div>
-
-              <div>
-                <span>🏔️ Elevation</span>
-                <strong>{elevation} m</strong>
-              </div>
-
-              <div>
-                <span>🌡️ Temperature</span>
-                <strong>{temperature}°C</strong>
-              </div>
-
+                ))}
             </div>
           </div>
 
+          {/* Result Actions */}
+          <div className="result-actions">
+            <button
+              type="button"
+              className="new-prediction-button"
+              onClick={resetForm}
+            >
+              + New Prediction
+            </button>
+
+            <button
+              type="button"
+              className="dashboard-result-button"
+              onClick={() => navigate("/dashboard")}
+            >
+              View Dashboard →
+            </button>
+          </div>
         </div>
       )}
     </div>

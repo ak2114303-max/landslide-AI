@@ -7,8 +7,24 @@ from pydantic import BaseModel
 from datetime import datetime
 
 
+
 # Load trained ML model
 model = joblib.load("landslide_model.pkl")
+FEATURE_NAMES = [
+    "rainfall_mm",
+    "soil_moisture",
+    "slope_degree",
+    "elevation_m",
+    "temperature_c",
+]
+
+FEATURE_IMPORTANCE = {
+    name: round(float(importance), 4)
+    for name, importance in zip(
+        FEATURE_NAMES,
+        model.feature_importances_
+    )
+}
 
 
 class PredictionInput(BaseModel):
@@ -148,8 +164,9 @@ def predict_risk(data: PredictionInput):
 
     else:
         risk_level = "Low"
-
     return {
-        "risk_score": risk_score,
-        "risk_level": risk_level,
-    }
+    "risk_score": risk_score,
+    "risk_level": risk_level,
+    "model_name": "Random Forest",
+    "feature_importance": FEATURE_IMPORTANCE,
+}
