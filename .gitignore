@@ -2,6 +2,7 @@
 backend/venv/
 __pycache__/
 *.pyc
+*.pyo
 
 # Node
 frontend/node_modules/
@@ -9,3 +10,24 @@ frontend/dist/
 
 # Environment files
 .env
+.env.*
+
+# Backend generated/cache files
+backend/cache/
+backend/weather_cache.json
+backend/roads_cache.json
+backend/landslide_reports/
+
+# Local/test files
+backend/*.nc
+
+# Generated local datasets
+backend/ner_landslide_master_dataset.csv
+
+# Python cache
+backend/__pycache__/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/

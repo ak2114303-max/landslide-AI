@@ -1,201 +1,657 @@
-import pandas as pd
-import numpy as np
+import os
 import joblib
+import numpy as np
+import pandas as pd
 
-from sklearn.model_selection import train_test_split, cross_val_score, KFold
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-from xgboost import XGBRegressor
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 
 
-# ========================================
-# Load Dataset
-# ========================================
+# ============================================================
+# 1. PROJECT PATH
+# ============================================================
 
-data = pd.read_csv("landslide_dataset.csv")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-features = [
-    "rainfall_mm",
-    "soil_moisture",
-    "slope_degree",
-    "elevation_m",
-    "temperature_c",
+
+# ============================================================
+# 2. FIND RAINFALL DATASET
+# ============================================================
+
+possible_files = [
+    os.path.join(
+        BASE_DIR,
+        "data",
+        "imd_rainfall",
+        "processed",
+        "ner_rainfall_features.csv"
+    ),
+    os.path.join(
+        BASE_DIR,
+        "data",
+        "imd_rainfall",
+        "processed",
+        "ner_rainfall_features.csv.csv"
+    )
 ]
 
-target = "risk_score"
+DATA_FILE = None
 
-X = data[features]
-y = data[target]
+for file in possible_files:
+    if os.path.exists(file):
+        DATA_FILE = file
+        break
+
+if DATA_FILE is None:
+    raise FileNotFoundError(
+        "\nERROR: ner_rainfall_features.csv not found.\n"
+        "Please check:\n"
+        "backend/data/imd_rainfall/processed/\n"
+    )
+
+print("=" * 60)
+print("LANDSLIDE AI - MODEL TRAINING")
+print("=" * 60)
+
+print("\nUsing dataset:")
+print(DATA_FILE)
 
 
-# ========================================
-# Train / Test Split
-# ========================================
+# ============================================================
+# 3. LOAD DATA
+# ============================================================
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=42,
+df = pd.read_csv(DATA_FILE)
+
+print("\nDataset shape:", df.shape)
+
+print("\nOriginal columns:")
+print(df.columns.tolist())
+
+
+# ============================================================
+# 4. CLEAN COLUMN NAMES
+# ============================================================
+
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.lower()
+    .str.replace(" ", "_")
+)
+
+print("\nCleaned columns:")
+print(df.columns.tolist())
+
+
+# ============================================================
+# 5. FIND RAINFALL COLUMNS
+# ============================================================
+
+def find_column(possible_names):
+
+    for name in possible_names:
+        if name in df.columns:
+            return name
+
+    return None
+
+
+rain1 = find_column([
+    "rainfall_1d_mm",
+    "rainfall_1d",
+    "rainfall_1_day_mm",
+    "rainfall_1_day",
+    "rain_1d"
+])
+
+rain3 = find_column([
+    "rainfall_3d_mm",
+    "rainfall_3d",
+    "rainfall_3_day_mm",
+    "rainfall_3_day",
+    "rain_3d"
+])
+
+rain7 = find_column([
+    "rainfall_7d_mm",
+    "rainfall_7d",
+    "rainfall_7_day_mm",
+    "rainfall_7_day",
+    "rain_7d"
+])
+
+rain15 = find_column([
+    "rainfall_15d_mm",
+    "rainfall_15d",
+    "rainfall_15_day_mm",
+    "rainfall_15_day",
+    "rain_15d"
+])
+
+
+print("\nDetected rainfall columns:")
+
+print("1 Day  :", rain1)
+print("3 Days :", rain3)
+print("7 Days :", rain7)
+print("15 Days:", rain15)
+
+
+# ============================================================
+# 6. CHECK REQUIRED COLUMNS
+# ============================================================
+
+required_rainfall = [
+    rain1,
+    rain3,
+    rain7,
+    rain15
+]
+
+if any(col is None for col in required_rainfall):
+
+    raise ValueError(
+        "\nRequired rainfall columns were not found.\n\n"
+        f"Available columns:\n{df.columns.tolist()}"
+    )
+
+
+# ============================================================
+# 7. CLEAN RAINFALL DATA
+# ============================================================
+
+for col in required_rainfall:
+
+    df[col] = pd.to_numeric(
+        df[col],
+        errors="coerce"
+    )
+
+    df[col] = df[col].fillna(0)
+
+
+# ============================================================
+# 8. DATE CLEANING
+# ============================================================
+
+if "date" in df.columns:
+
+    df["date"] = pd.to_datetime(
+        df["date"],
+        errors="coerce"
+    )
+
+
+# ============================================================
+# 9. PROTOTYPE ENVIRONMENT FEATURES
+# ============================================================
+
+# IMPORTANT:
+# These features are prototype-derived/simulated.
+# They should be replaced with verified real datasets
+# when available.
+
+rng = np.random.default_rng(42)
+
+
+# Elevation in meters
+df["elevation"] = rng.uniform(
+    50,
+    2500,
+    len(df)
 )
 
 
-# ========================================
-# Models
-# ========================================
+# Slope in degrees
+df["slope"] = rng.uniform(
+    5,
+    45,
+    len(df)
+)
 
-models = {
-    "Random Forest": RandomForestRegressor(
-        n_estimators=200,
-        random_state=42,
-    ),
 
-    "Gradient Boosting": GradientBoostingRegressor(
-        n_estimators=100,
-        learning_rate=0.05,
-        max_depth=3,
-        random_state=42,
-    ),
+# Soil moisture proxy
+df["soil_moisture"] = np.clip(
+    0.25
+    +
+    (
+        df[rain7]
+        /
+        (df[rain7].max() + 1)
+    )
+    * 0.65,
+    0,
+    1
+)
 
-    "XGBoost": XGBRegressor(
-        n_estimators=100,
-        learning_rate=0.05,
-        max_depth=3,
-        objective="reg:squarederror",
-        random_state=42,
-    ),
+
+# Temperature proxy
+df["temperature"] = rng.uniform(
+    15,
+    32,
+    len(df)
+)
+
+
+# NDVI proxy
+df["ndvi"] = rng.uniform(
+    0.25,
+    0.85,
+    len(df)
+)
+
+
+# ============================================================
+# 10. RAINFALL INTENSITY SCORE
+# ============================================================
+
+df["rainfall_score"] = (
+    df[rain1] * 0.35
+    +
+    df[rain3] * 0.25
+    +
+    df[rain7] * 0.25
+    +
+    df[rain15] * 0.15
+)
+
+
+# ============================================================
+# 11. NORMALIZE RAINFALL
+# ============================================================
+
+rainfall_95 = df["rainfall_score"].quantile(
+    0.95
+)
+
+rain_norm = (
+    df["rainfall_score"]
+    /
+    (rainfall_95 + 1e-6)
+)
+
+rain_norm = rain_norm.clip(
+    0,
+    1
+)
+
+
+# ============================================================
+# 12. NORMALIZE SLOPE
+# ============================================================
+
+slope_norm = (
+    df["slope"] / 45
+)
+
+slope_norm = slope_norm.clip(
+    0,
+    1
+)
+
+
+# ============================================================
+# 13. RISK SCORE
+# ============================================================
+
+df["risk_score"] = (
+    rain_norm * 0.60
+    +
+    slope_norm * 0.20
+    +
+    df["soil_moisture"] * 0.20
+)
+
+
+# ============================================================
+# 14. CREATE RISK LABEL
+# ============================================================
+
+def assign_risk(score):
+
+    if score < 0.40:
+
+        return 0       # LOW
+
+    elif score < 0.70:
+
+        return 1       # MEDIUM
+
+    else:
+
+        return 2       # HIGH
+
+
+df["risk_label"] = (
+    df["risk_score"]
+    .apply(assign_risk)
+)
+
+
+# ============================================================
+# 15. RISK NAME
+# ============================================================
+
+df["risk"] = (
+    df["risk_label"]
+    .map({
+        0: "LOW",
+        1: "MEDIUM",
+        2: "HIGH"
+    })
+)
+
+
+# ============================================================
+# 16. ML FEATURES
+# ============================================================
+
+features = [
+
+    rain1,
+    rain3,
+    rain7,
+    rain15,
+
+    "elevation",
+    "slope",
+    "soil_moisture",
+    "temperature",
+    "ndvi"
+]
+
+
+print("\nML Features:")
+
+for feature in features:
+    print(" -", feature)
+
+
+# ============================================================
+# 17. CREATE X AND Y
+# ============================================================
+
+X = df[features]
+
+y = df["risk_label"]
+
+
+# ============================================================
+# 18. REMOVE INVALID VALUES
+# ============================================================
+
+X = X.replace(
+    [np.inf, -np.inf],
+    np.nan
+)
+
+X = X.fillna(0)
+
+y = y.fillna(0)
+
+
+# ============================================================
+# 19. TRAIN / TEST SPLIT
+# ============================================================
+
+X_train, X_test, y_train, y_test = train_test_split(
+
+    X,
+    y,
+
+    test_size=0.20,
+
+    random_state=42,
+
+    stratify=y
+)
+
+
+print("\nTraining samples:", len(X_train))
+print("Testing samples :", len(X_test))
+
+
+# ============================================================
+# 20. RANDOM FOREST MODEL
+# ============================================================
+
+model = RandomForestClassifier(
+
+    n_estimators=200,
+
+    max_depth=12,
+
+    random_state=42,
+
+    class_weight="balanced",
+
+    n_jobs=-1
+)
+
+
+print("\nTraining Random Forest...")
+
+model.fit(
+    X_train,
+    y_train
+)
+
+
+print("Training completed.")
+
+
+# ============================================================
+# 21. MODEL PREDICTION
+# ============================================================
+
+predictions = model.predict(
+    X_test
+)
+
+
+# ============================================================
+# 22. MODEL EVALUATION
+# ============================================================
+
+print("\n")
+print("=" * 60)
+print("MODEL EVALUATION")
+print("=" * 60)
+
+print(
+    classification_report(
+        y_test,
+        predictions,
+        target_names=[
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+        ],
+        zero_division=0
+    )
+)
+
+
+# ============================================================
+# 23. MODEL PROBABILITY TEST
+# ============================================================
+
+probabilities = model.predict_proba(
+    X_test
+)
+
+print("\nExample prediction probabilities:")
+
+for i in range(
+    min(5, len(probabilities))
+):
+
+    print(
+        probabilities[i]
+    )
+
+
+# ============================================================
+# 24. SAVE MODEL
+# ============================================================
+
+MODEL_FILE = os.path.join(
+
+    BASE_DIR,
+
+    "landslide_model.pkl"
+)
+
+
+model_package = {
+
+    "model": model,
+
+    "features": features,
+
+    "risk_classes": {
+
+        0: "LOW",
+
+        1: "MEDIUM",
+
+        2: "HIGH"
+
+    }
+
 }
 
 
-# ========================================
-# Cross Validation
-# ========================================
-
-cv = KFold(
-    n_splits=5,
-    shuffle=True,
-    random_state=42,
-)
-
-
-results = {}
-
-
-print()
-print("========================================")
-print("LandslideAI Model Comparison")
-print("========================================")
-
-
-for name, model in models.items():
-
-    # Train model
-    model.fit(X_train, y_train)
-
-    # Test prediction
-    predictions = model.predict(X_test)
-
-    # Evaluation metrics
-    mae = mean_absolute_error(y_test, predictions)
-
-    rmse = np.sqrt(
-        mean_squared_error(y_test, predictions)
-    )
-
-    test_r2 = r2_score(y_test, predictions)
-
-    # Cross-validation
-    cv_scores = cross_val_score(
-        model,
-        X,
-        y,
-        cv=cv,
-        scoring="r2",
-    )
-
-    cv_mean = cv_scores.mean()
-    cv_std = cv_scores.std()
-
-    results[name] = {
-        "model": model,
-        "mae": mae,
-        "rmse": rmse,
-        "test_r2": test_r2,
-        "cv_mean": cv_mean,
-        "cv_std": cv_std,
-    }
-
-    print()
-    print(name)
-    print("----------------------------")
-    print(f"MAE: {mae:.4f}")
-    print(f"RMSE: {rmse:.4f}")
-    print(f"Test R²: {test_r2:.4f}")
-    print(f"Cross-validation R²: {cv_mean:.4f}")
-    print(f"CV Standard Deviation: {cv_std:.4f}")
-
-
-# ========================================
-# Select Best Model
-# ========================================
-
-best_model_name = max(
-    results,
-    key=lambda name: results[name]["cv_mean"],
-)
-
-best_model = results[best_model_name]["model"]
-
-
-print()
-print("========================================")
-print("Best Model")
-print("========================================")
-
-print(f"Selected model: {best_model_name}")
-
-print(
-    f"Cross-validation R²: "
-    f"{results[best_model_name]['cv_mean']:.6f}"
-)
-
-print(
-    f"CV Standard Deviation: "
-    f"{results[best_model_name]['cv_std']:.6f}"
-)
-
-
-# ========================================
-# Feature Importance
-# ========================================
-
-print()
-print("Feature Importance:")
-print("----------------------------")
-
-if hasattr(best_model, "feature_importances_"):
-
-    importances = best_model.feature_importances_
-
-    for feature, importance in zip(features, importances):
-        print(
-            f"{feature}: "
-            f"{importance * 100:.2f}%"
-        )
-
-
-# ========================================
-# Save Best Model
-# ========================================
-
 joblib.dump(
-    best_model,
-    "landslide_model.pkl",
+
+    model_package,
+
+    MODEL_FILE
+
 )
 
 
-print()
-print("Best model saved as landslide_model.pkl")
-print("========================================")
-print()
+print("\nModel saved at:")
+
+print(MODEL_FILE)
+
+
+# ============================================================
+# 25. SAVE ML DATASET
+# ============================================================
+
+OUTPUT_DIR = os.path.join(
+
+    BASE_DIR,
+
+    "data",
+
+    "imd_rainfall",
+
+    "merged"
+
+)
+
+
+os.makedirs(
+
+    OUTPUT_DIR,
+
+    exist_ok=True
+
+)
+
+
+OUTPUT_FILE = os.path.join(
+
+    OUTPUT_DIR,
+
+    "ner_landslide_ml_dataset.csv"
+
+)
+
+
+df.to_csv(
+
+    OUTPUT_FILE,
+
+    index=False
+
+)
+
+
+print("\nML dataset saved at:")
+
+print(OUTPUT_FILE)
+
+
+# ============================================================
+# 26. RISK DISTRIBUTION
+# ============================================================
+
+print("\n")
+print("=" * 60)
+print("RISK DISTRIBUTION")
+print("=" * 60)
+
+risk_distribution = (
+
+    df["risk"]
+    .value_counts()
+)
+
+
+print(
+    risk_distribution
+)
+
+
+# ============================================================
+# 27. FINAL SUMMARY
+# ============================================================
+
+print("\n")
+print("=" * 60)
+print("MODEL TRAINING COMPLETED SUCCESSFULLY")
+print("=" * 60)
+
+print(
+    "\nTotal records:",
+    len(df)
+)
+
+print(
+    "Features:",
+    len(features)
+)
+
+print(
+    "Random Forest trees:",
+    200
+)
+
+print(
+    "\nRisk classes:"
+)
+
+print("0 = LOW")
+print("1 = MEDIUM")
+print("2 = HIGH")
+
+print(
+    "\nNext step:"
+)
+
+print(
+    "Connect Random Forest model with FastAPI backend."
+)
+
+print(
+    "\nNOTE:"
+)
+
+print(
+    "Terrain/environment features are prototype-derived."
+)

@@ -1,32 +1,39 @@
-
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Scenario.css";
 
+const API_BASE = "http://127.0.0.1:8000";
+
+interface ScenarioResult {
+  risk_score: number;
+  risk_level: string;
+}
+
 function Scenario() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const location = searchParams.get("location") || "Custom Location";
+  const location =
+    searchParams.get("location") || "Custom Location";
 
-  // Original values of the selected location
+  // Original values of selected location
   const originalRainfall =
-    searchParams.get("rainfall") || "240";
+    searchParams.get("rainfall") || "50";
 
   const originalSoilMoisture =
-    searchParams.get("soilMoisture") || "86";
+    searchParams.get("soilMoisture") || "50";
 
   const originalSlope =
-    searchParams.get("slope") || "45";
+    searchParams.get("slope") || "30";
 
   const originalElevation =
-    searchParams.get("elevation") || "2050";
+    searchParams.get("elevation") || "1000";
 
   const originalTemperature =
-    searchParams.get("temperature") || "15";
+    searchParams.get("temperature") || "20";
 
-  // Baseline risk of the selected location
+  // Baseline risk
   const baselineRisk = Number(
     searchParams.get("baselineRisk") || 0
   );
@@ -46,10 +53,8 @@ function Scenario() {
   const [temperature, setTemperature] =
     useState(originalTemperature);
 
-  const [result, setResult] = useState<{
-    risk_score: number;
-    risk_level: string;
-  } | null>(null);
+  const [result, setResult] =
+    useState<ScenarioResult | null>(null);
 
   const [loading, setLoading] =
     useState(false);
@@ -60,23 +65,58 @@ function Scenario() {
       )
     : 0;
 
+  // --------------------------------
   // Run AI scenario prediction
+  // --------------------------------
+
   const runScenario = async () => {
     setLoading(true);
 
     try {
+      const rainfallValue = Number(rainfall);
+
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/predict",
+        `${API_BASE}/api/predict`,
         {
-          rainfall_mm: Number(rainfall),
-          soil_moisture: Number(soilMoisture),
-          slope_degree: Number(slope),
-          elevation_m: Number(elevation),
-          temperature_c: Number(temperature),
+          // Required ML rainfall features
+          rainfall_1d_mm: rainfallValue,
+          rainfall_3d_mm: rainfallValue,
+          rainfall_7d_mm: rainfallValue,
+          rainfall_15d_mm: rainfallValue,
+
+          // Required terrain/environment features
+          elevation: Number(elevation),
+          slope: Number(slope),
+
+          // Backend model uses 0-1 soil moisture
+          soil_moisture:
+            Number(soilMoisture) / 100,
+
+          temperature: Number(temperature),
+
+          // Prototype default because Scenario UI
+          // does not currently expose NDVI
+          ndvi: 0.5,
         }
       );
 
-      setResult(response.data);
+      const data = response.data;
+
+      const riskScore = Number(
+        data.risk_probability ??
+        data.risk_score ??
+        0
+      );
+
+      const riskLevel =
+        data.risk_level || "LOW";
+
+      setResult({
+        risk_score: Number(
+          riskScore.toFixed(2)
+        ),
+        risk_level: riskLevel,
+      });
     } catch (error) {
       console.error(
         "Scenario prediction error:",
@@ -86,19 +126,21 @@ function Scenario() {
       alert(
         "Unable to connect to the AI prediction server."
       );
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  // Reset values to original location conditions
+  // --------------------------------
+  // Reset scenario
+  // --------------------------------
+
   const resetScenario = () => {
     setRainfall(originalRainfall);
     setSoilMoisture(originalSoilMoisture);
     setSlope(originalSlope);
     setElevation(originalElevation);
     setTemperature(originalTemperature);
-
     setResult(null);
   };
 
@@ -111,7 +153,9 @@ function Scenario() {
 
         <p>WHAT-IF ANALYSIS</p>
 
-        <h1>Scenario Analysis</h1>
+        <h1>
+          Scenario Analysis
+        </h1>
 
         <span>
           Adjust environmental conditions and see
@@ -128,9 +172,9 @@ function Scenario() {
 
       <button
         className="scenario-back-button"
-        onClick={() => navigate("/alerts")}
+        onClick={() => navigate("/dashboard")}
       >
-        ← Back to Alerts
+        ← Back to Dashboard
       </button>
 
       {/* Scenario Inputs */}
@@ -139,7 +183,9 @@ function Scenario() {
 
         <div className="scenario-input">
 
-          <label>Rainfall (mm)</label>
+          <label>
+            Rainfall (mm)
+          </label>
 
           <input
             type="number"
@@ -155,7 +201,9 @@ function Scenario() {
 
         <div className="scenario-input">
 
-          <label>Soil Moisture (%)</label>
+          <label>
+            Soil Moisture (%)
+          </label>
 
           <input
             type="number"
@@ -171,7 +219,9 @@ function Scenario() {
 
         <div className="scenario-input">
 
-          <label>Slope (degrees)</label>
+          <label>
+            Slope (degrees)
+          </label>
 
           <input
             type="number"
@@ -187,7 +237,9 @@ function Scenario() {
 
         <div className="scenario-input">
 
-          <label>Elevation (m)</label>
+          <label>
+            Elevation (m)
+          </label>
 
           <input
             type="number"
@@ -203,7 +255,9 @@ function Scenario() {
 
         <div className="scenario-input">
 
-          <label>Temperature (°C)</label>
+          <label>
+            Temperature (°C)
+          </label>
 
           <input
             type="number"
@@ -217,7 +271,7 @@ function Scenario() {
 
         </div>
 
-        {/* Run + Reset Buttons */}
+        {/* Run Button */}
 
         <button
           onClick={runScenario}
@@ -227,6 +281,8 @@ function Scenario() {
             ? "Analyzing Scenario..."
             : "Run Scenario Analysis"}
         </button>
+
+        {/* Reset Button */}
 
         <button
           type="button"
@@ -247,7 +303,9 @@ function Scenario() {
           className={`scenario-result ${result.risk_level.toLowerCase()}`}
         >
 
-          <p>Scenario Result</p>
+          <p>
+            Scenario Result
+          </p>
 
           <h2>
             {result.risk_score}%

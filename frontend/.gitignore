@@ -9,3 +9,19 @@ frontend/dist/
 
 # Environment files
 .env
+
+# Backend generated/cache files
+backend/cache/
+backend/weather_cache.json
+backend/roads_cache.json
+backend/landslide_reports/
+
+# Large/local test files
+backend/*.nc
+
+# Local generated datasets
+backend/ner_landslide_master_dataset.csv
+
+# Python generated files
+backend/__pycache__/
+*.pyc

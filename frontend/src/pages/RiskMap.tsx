@@ -1,313 +1,1093 @@
-
 import {
   MapContainer,
   TileLayer,
-  Circle,
   Popup,
   Marker,
   Tooltip,
+  Polyline,
+  LayersControl,
+  LayerGroup,
+  GeoJSON,
 } from "react-leaflet";
+
 import { useNavigate } from "react-router-dom";
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import L from "leaflet";
 import axios from "axios";
+
 import "leaflet/dist/leaflet.css";
 import "./RiskMap.css";
 
-interface LocationData {
-  location: string;
-  latitude: number;
-  longitude: number;
-  risk_score: number;
-  risk_level: string;
-  rainfall_mm: number;
+import { NER_STATES } from "../data/nerStates";
+import nerDistricts from "../data/nerDistricts.json";
+
+// ==================================================
+// API
+// ==================================================
+
+const API_BASE = "http://127.0.0.1:8000";
+
+// ==================================================
+// Interfaces
+// ==================================================
+
+interface DistrictRisk {
+  state: string;
+  district: string;
+  date: string;
+
+  rainfall_1d_mm: number;
+  rainfall_3d_mm: number;
+  rainfall_7d_mm: number;
+  rainfall_15d_mm: number;
+
+  elevation: number;
+  slope: number;
   soil_moisture: number;
-  slope_degree: number;
-  elevation_m: number;
-  temperature_c: number;
+  temperature: number;
+  ndvi: number;
+
+  risk_level: string;
+  risk_probability: number;
 }
 
-const getRiskColor = (riskLevel: string) => {
-  switch (riskLevel) {
-    case "Low":
-      return "#4caf50";
-    case "Moderate":
-      return "#e0b43c";
-    case "High":
-      return "#e67e22";
-    case "Critical":
-      return "#d64545";
+interface RoadData {
+  id: number;
+  name: string;
+  status: string;
+  risk_level: string;
+  coordinates: [number, number][];
+}
+
+// ==================================================
+// NER DISTRICT GEOJSON
+// ==================================================
+
+const nerGeoJson = {
+  ...nerDistricts,
+
+  features: nerDistricts.features.filter(
+    (feature: any) =>
+      NER_STATES.some(
+        (state) =>
+          state.trim().toUpperCase() ===
+          feature.properties?.st_nm
+            ?.trim()
+            .toUpperCase()
+      )
+  ),
+};
+
+// ==================================================
+// NORMALIZE STATE
+// ==================================================
+
+const normalizeState = (
+  value: string = ""
+) => {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+};
+
+// ==================================================
+// NORMALIZE DISTRICT
+// ==================================================
+
+const normalizeDistrict = (
+  value: string = ""
+) => {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+};
+
+// ==================================================
+// RISK COLOR
+// ==================================================
+
+const getRiskColor = (
+  riskLevel: string
+) => {
+  switch (
+    riskLevel?.toUpperCase()
+  ) {
+    case "LOW":
+      return "#22c55e";
+
+    case "MEDIUM":
+    case "MODERATE":
+      return "#eab308";
+
+    case "HIGH":
+      return "#ef4444";
+
+    case "CRITICAL":
+      return "#991b1b";
+
+    case "UNAVAILABLE":
+      return "#94a3b8";
+
     default:
-      return "#e0b43c";
+      return "#94a3b8";
   }
 };
 
-const createRiskIcon = (riskLevel: string) => {
-  const color = getRiskColor(riskLevel);
+// ==================================================
+// RISK MARKER
+// ==================================================
+
+const createRiskIcon = (
+  riskLevel: string
+) => {
+  const color =
+    getRiskColor(riskLevel);
 
   return L.divIcon({
-    className: "custom-risk-marker",
+    className:
+      "custom-risk-marker",
+
     html: `
-      <div style="
-        width: 18px;
-        height: 18px;
-        background: ${color};
-        border: 3px solid white;
-        border-radius: 50%;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.35);
-      "></div>
+      <div
+        style="
+          width: 17px;
+          height: 17px;
+          background: ${color};
+          border: 3px solid white;
+          border-radius: 50%;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        "
+      ></div>
     `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+
+    iconSize: [23, 23],
+
+    iconAnchor: [11.5, 11.5],
   });
 };
 
-function RiskMap() {
-  const navigate = useNavigate();
+// ==================================================
+// GET DISTRICT CENTER
+// ==================================================
 
-  const [locations, setLocations] = useState<LocationData[]>([]);
-  const [selectedLocation, setSelectedLocation] =
-    useState<LocationData | null>(null);
+const getDistrictCenter = (
+  feature: any
+): [number, number] | null => {
+  try {
+    const layer =
+      L.geoJSON(feature);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+    const bounds =
+      layer.getBounds();
 
-  const fetchLocations = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await axios.get(
-        "http://127.0.0.1:8000/api/locations"
-      );
-
-      setLocations(response.data);
-
-      if (response.data.length > 0) {
-        setSelectedLocation(response.data[0]);
-      }
-    } catch (error) {
-      console.error("Location API error:", error);
-      setError("Unable to load location data from the server.");
-    } finally {
-      setLoading(false);
+    if (!bounds.isValid()) {
+      return null;
     }
-  };
+
+    const center =
+      bounds.getCenter();
+
+    return [
+      center.lat,
+      center.lng,
+    ];
+  } catch {
+    return null;
+  }
+};
+
+// ==================================================
+// MAIN COMPONENT
+// ==================================================
+
+function RiskMap() {
+  const navigate =
+    useNavigate();
+
+  // ==================================================
+  // STATE
+  // ==================================================
+
+  const [districts, setDistricts] =
+    useState<DistrictRisk[]>([]);
+
+  const [selectedDistrict, setSelectedDistrict] =
+    useState<DistrictRisk | null>(
+      null
+    );
+
+  const [roads, setRoads] =
+    useState<RoadData[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  // ==================================================
+  // FETCH DISTRICT DATA
+  // ==================================================
+
+  const fetchDistrictRisk =
+    async () => {
+      try {
+        setError("");
+
+        const response =
+          await axios.get(
+            `${API_BASE}/api/districts`,
+            {
+              timeout: 30000,
+            }
+          );
+
+        if (
+          !response.data ||
+          !Array.isArray(
+            response.data.data
+          )
+        ) {
+          throw new Error(
+            "Invalid district API response"
+          );
+        }
+
+        const districtData =
+          response.data.data as DistrictRisk[];
+
+        setDistricts(
+          districtData
+        );
+
+        setSelectedDistrict(
+          (current) => {
+            if (!current) {
+              return (
+                districtData[0] ||
+                null
+              );
+            }
+
+            const updated =
+              districtData.find(
+                (item) =>
+                  normalizeState(
+                    item.state
+                  ) ===
+                    normalizeState(
+                      current.state
+                    ) &&
+                  normalizeDistrict(
+                    item.district
+                  ) ===
+                    normalizeDistrict(
+                      current.district
+                    )
+              );
+
+            return (
+              updated ||
+              districtData[0] ||
+              null
+            );
+          }
+        );
+
+        console.log(
+          "Districts received:",
+          districtData.length
+        );
+
+        console.log(
+          "Sikkim districts:",
+          districtData.filter(
+            (item) =>
+              normalizeState(
+                item.state
+              ) === "SIKKIM"
+          )
+        );
+      } catch (err) {
+        console.error(
+          "District API error:",
+          err
+        );
+
+        setError(
+          "Unable to load district risk data from the server."
+        );
+      }
+    };
+
+  // ==================================================
+  // FETCH ROADS
+  // ==================================================
+
+  const fetchRoads =
+    async () => {
+      try {
+        const response =
+          await axios.get(
+            `${API_BASE}/api/roads`,
+            {
+              timeout: 30000,
+            }
+          );
+
+        setRoads(
+          response.data || []
+        );
+      } catch (err) {
+        console.error(
+          "Road API error:",
+          err
+        );
+
+        setRoads([]);
+      }
+    };
+
+  // ==================================================
+  // INITIAL LOAD
+  // ==================================================
 
   useEffect(() => {
-    fetchLocations();
+    const loadData =
+      async () => {
+        setLoading(true);
+
+        await Promise.all([
+          fetchDistrictRisk(),
+          fetchRoads(),
+        ]);
+
+        setLoading(false);
+      };
+
+    loadData();
   }, []);
+
+  // ==================================================
+  // REFRESH
+  // ==================================================
+
+  const handleRefresh =
+    async () => {
+      setRefreshing(true);
+
+      await Promise.all([
+        fetchDistrictRisk(),
+        fetchRoads(),
+      ]);
+
+      setRefreshing(false);
+    };
+
+  // ==================================================
+  // FIND DISTRICT
+  // ==================================================
+
+  const getDistrictData =
+    (
+      state: string,
+      district: string
+    ) => {
+
+      const targetState =
+        normalizeState(state);
+
+      const targetDistrict =
+        normalizeDistrict(
+          district
+        );
+
+      // ==================================================
+      // SIKKIM SPECIAL MAPPING
+      //
+      // GeoJSON:
+      // East Sikkim -> Backend Pakyong
+      // West Sikkim -> Backend Soreng
+      // ==================================================
+
+      if (
+        targetState === "SIKKIM"
+      ) {
+
+        if (
+          targetDistrict ===
+            "EAST SIKKIM" ||
+          targetDistrict ===
+            "EAST DISTRICT" ||
+          targetDistrict ===
+            "EAST"
+        ) {
+
+          return districts.find(
+            (item) =>
+              normalizeState(
+                item.state
+              ) === "SIKKIM" &&
+              normalizeDistrict(
+                item.district
+              ) === "PAKYONG"
+          );
+
+        }
+
+        if (
+          targetDistrict ===
+            "WEST SIKKIM" ||
+          targetDistrict ===
+            "WEST DISTRICT" ||
+          targetDistrict ===
+            "WEST"
+        ) {
+
+          return districts.find(
+            (item) =>
+              normalizeState(
+                item.state
+              ) === "SIKKIM" &&
+              normalizeDistrict(
+                item.district
+              ) === "SORENG"
+          );
+
+        }
+      }
+
+      // ==================================================
+      // NORMAL MATCHING
+      // ==================================================
+
+      return districts.find(
+        (item) =>
+          normalizeState(
+            item.state
+          ) === targetState &&
+          normalizeDistrict(
+            item.district
+          ) === targetDistrict
+      );
+    };
+
+  // ==================================================
+  // STATISTICS
+  // ==================================================
+
+  const lowCount =
+    districts.filter(
+      (d) =>
+        d.risk_level?.toUpperCase() ===
+        "LOW"
+    ).length;
+
+  const mediumCount =
+    districts.filter(
+      (d) =>
+        [
+          "MEDIUM",
+          "MODERATE",
+        ].includes(
+          d.risk_level?.toUpperCase()
+        )
+    ).length;
+
+  const highCount =
+    districts.filter(
+      (d) =>
+        [
+          "HIGH",
+          "CRITICAL",
+        ].includes(
+          d.risk_level?.toUpperCase()
+        )
+    ).length;
+
+  // ==================================================
+  // LOADING SCREEN
+  // ==================================================
+
+  if (loading) {
+    return (
+      <div className="risk-map-page">
+
+        <div className="risk-map-header">
+
+          <div>
+
+            <p className="map-label">
+              LANDSLIDE MONITORING
+            </p>
+
+            <h1>
+              Interactive Risk Map
+            </h1>
+
+            <p>
+              Loading NER district risk data...
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+    );
+  }
+
+  // ==================================================
+  // MAIN UI
+  // ==================================================
 
   return (
     <div className="risk-map-page">
 
-      {/* Header */}
-      <div className="risk-map-header">
-        <div>
-          <p className="map-label">LANDSLIDE MONITORING</p>
+      {/* ==================================================
+          HEADER
+      ================================================== */}
 
-          <h1>Interactive Risk Map</h1>
+      <div className="risk-map-header">
+
+        <div>
+
+          <p className="map-label">
+            LANDSLIDE MONITORING
+          </p>
+
+          <h1>
+            Interactive Risk Map
+          </h1>
 
           <button
             className="back-dashboard-button"
-            onClick={() => navigate("/dashboard")}
+            onClick={() =>
+              navigate(
+                "/dashboard"
+              )
+            }
           >
             ← Back to Dashboard
           </button>
 
           <p>
-            Explore landslide risk zones and monitored locations
-            across mountainous regions.
+            District-level AI-powered
+            landslide risk monitoring
+            across the eight North Eastern
+            Region states.
           </p>
+
         </div>
 
         <div className="map-status">
+
           <span></span>
-          Live Monitoring
+
+          AI Monitoring
 
           <small>
-            {loading ? "Updating..." : "Updated just now"}
+            {refreshing
+              ? "Updating district data..."
+              : `${districts.length} districts connected`}
           </small>
+
         </div>
 
         <button
           className="refresh-button"
-          onClick={fetchLocations}
-          disabled={loading}
+          onClick={
+            handleRefresh
+          }
+          disabled={
+            refreshing
+          }
         >
-          {loading ? "Refreshing..." : "↻ Refresh Data"}
+          {refreshing
+            ? "Updating..."
+            : "↻ Refresh Data"}
         </button>
+
       </div>
 
-      {/* Main Layout */}
+      {/* ==================================================
+          MAIN LAYOUT
+      ================================================== */}
+
       <div className="map-layout">
 
-        {/* Left Panel */}
+        {/* ==================================================
+            LEFT PANEL
+        ================================================== */}
+
         <aside className="map-panel">
 
-          <h2>Risk Overview</h2>
+          <h2>
+            AI Risk Overview
+          </h2>
 
           <p className="panel-description">
-            Current landslide risk assessment
+            Current district-level
+            landslide risk generated by
+            the Random Forest model using
+            IMD rainfall and environmental
+            features.
           </p>
 
-          {/* Risk Legend */}
+          {/* ==================================================
+              LEGEND
+          ================================================== */}
+
           <div className="risk-legend">
+
             <div>
-              <span className="legend-dot low"></span>
+
+              <span
+                className="legend-dot low"
+              ></span>
+
               Low
+
             </div>
 
             <div>
-              <span className="legend-dot moderate"></span>
-              Moderate
+
+              <span
+                className="legend-dot moderate"
+              ></span>
+
+              Medium
+
             </div>
 
             <div>
-              <span className="legend-dot high"></span>
+
+              <span
+                className="legend-dot high"
+              ></span>
+
               High
+
             </div>
 
             <div>
-              <span className="legend-dot critical"></span>
-              Critical
+
+              <span
+                className="legend-dot"
+                style={{
+                  background:
+                    "#94a3b8",
+                }}
+              ></span>
+
+              No Data
+
             </div>
+
           </div>
 
-          {/* Location Count */}
+          {/* ==================================================
+              DISTRICT COUNT
+          ================================================== */}
+
           <div className="location-count">
-            <span>📍 Monitored Locations</span>
-            <strong>{locations.length}</strong>
+
+            <span>
+              📍 NER Districts
+            </span>
+
+            <strong>
+              {districts.length}
+            </strong>
+
           </div>
 
-          {/* Error */}
+          {/* LOW */}
+
+          <div className="location-count">
+
+            <span>
+              🟢 Low Risk
+            </span>
+
+            <strong>
+              {lowCount}
+            </strong>
+
+          </div>
+
+          {/* MEDIUM */}
+
+          <div className="location-count">
+
+            <span>
+              🟡 Medium Risk
+            </span>
+
+            <strong>
+              {mediumCount}
+            </strong>
+
+          </div>
+
+          {/* HIGH */}
+
+          <div className="location-count">
+
+            <span>
+              🔴 High Risk
+            </span>
+
+            <strong>
+              {highCount}
+            </strong>
+
+          </div>
+
+          {/* ROADS */}
+
+          <div className="location-count">
+
+            <span>
+              🛣️ Monitored Roads
+            </span>
+
+            <strong>
+              {roads.length}
+            </strong>
+
+          </div>
+
+          {/* ERROR */}
+
           {error && (
             <div className="map-error">
               ⚠️ {error}
             </div>
           )}
 
-          {/* Selected Location */}
+          {/* ==================================================
+              SELECTED DISTRICT
+          ================================================== */}
+
           <div className="selected-location">
 
-            {loading && (
-              <p className="loading-text">
-                Loading locations...
-              </p>
-            )}
-
             <span className="location-tag">
-              MONITORED LOCATION
+              AI MONITORED DISTRICT
             </span>
 
             <h3>
-              {selectedLocation?.location || "Select a location"}
+              {selectedDistrict
+                ? selectedDistrict.district
+                : "Select a district"}
             </h3>
 
-            {/* Risk Score */}
-            <div
-              className={`risk-score-large ${
-                selectedLocation?.risk_level?.toLowerCase() || ""
-              }`}
-            >
-              <strong>
-                {selectedLocation
-                  ? `${selectedLocation.risk_score}%`
-                  : "--"}
-              </strong>
-
-              <span>
-                {selectedLocation
-                  ? `${selectedLocation.risk_level.toUpperCase()} RISK`
-                  : "SELECT LOCATION"}
-              </span>
-            </div>
-
-            {/* Environmental Factors */}
-            {selectedLocation && (
+            {selectedDistrict && (
               <>
-                <div className="location-factor">
-                  <span>📍 Location</span>
-                  <strong>{selectedLocation.location}</strong>
-                </div>
+
+                {/* STATE */}
 
                 <div className="location-factor">
-                  <span>🌧️ Rainfall</span>
+
+                  <span>
+                    🗺️ State
+                  </span>
+
                   <strong>
-                    {selectedLocation.rainfall_mm} mm
+                    {
+                      selectedDistrict.state
+                    }
                   </strong>
+
                 </div>
 
-                <div className="location-factor">
-                  <span>⛰️ Slope</span>
+                {/* RISK */}
+
+                <div
+                  className={`risk-score-large ${selectedDistrict.risk_level.toLowerCase()}`}
+                >
+
                   <strong>
-                    {selectedLocation.slope_degree}°
+                    {
+                      selectedDistrict.risk_probability
+                    }%
                   </strong>
+
+                  <span>
+                    {
+                      selectedDistrict.risk_level.toUpperCase()
+                    }{" "}
+                    RISK
+                  </span>
+
                 </div>
 
-                <div className="location-factor">
-                  <span>💧 Soil Moisture</span>
-                  <strong>
-                    {selectedLocation.soil_moisture}%
-                  </strong>
-                </div>
+                {/* DATE */}
 
                 <div className="location-factor">
-                  <span>🏔️ Elevation</span>
+
+                  <span>
+                    📅 Data Date
+                  </span>
+
                   <strong>
-                    {selectedLocation.elevation_m} m
+                    {
+                      selectedDistrict.date
+                    }
                   </strong>
+
                 </div>
 
+                {/* RAINFALL 1 DAY */}
+
                 <div className="location-factor">
-                  <span>🌡️ Temperature</span>
+
+                  <span>
+                    🌧️ Rainfall 1 Day
+                  </span>
+
                   <strong>
-                    {selectedLocation.temperature_c} °C
+                    {
+                      selectedDistrict.rainfall_1d_mm
+                    }{" "}
+                    mm
                   </strong>
+
                 </div>
+
+                {/* RAINFALL 3 DAYS */}
+
+                <div className="location-factor">
+
+                  <span>
+                    🌧️ Rainfall 3 Days
+                  </span>
+
+                  <strong>
+                    {
+                      selectedDistrict.rainfall_3d_mm
+                    }{" "}
+                    mm
+                  </strong>
+
+                </div>
+
+                {/* RAINFALL 7 DAYS */}
+
+                <div className="location-factor">
+
+                  <span>
+                    🌧️ Rainfall 7 Days
+                  </span>
+
+                  <strong>
+                    {
+                      selectedDistrict.rainfall_7d_mm
+                    }{" "}
+                    mm
+                  </strong>
+
+                </div>
+
+                {/* RAINFALL 15 DAYS */}
+
+                <div className="location-factor">
+
+                  <span>
+                    🌧️ Rainfall 15 Days
+                  </span>
+
+                  <strong>
+                    {
+                      selectedDistrict.rainfall_15d_mm
+                    }{" "}
+                    mm
+                  </strong>
+
+                </div>
+
+                {/* SLOPE */}
+
+                <div className="location-factor">
+
+                  <span>
+                    ⛰️ Slope
+                  </span>
+
+                  <strong>
+                    {
+                      selectedDistrict.slope.toFixed(
+                        2
+                      )
+                    }°
+                  </strong>
+
+                </div>
+
+                {/* SOIL MOISTURE */}
+
+                <div className="location-factor">
+
+                  <span>
+                    💧 Soil Moisture
+                  </span>
+
+                  <strong>
+                    {
+                      selectedDistrict.soil_moisture.toFixed(
+                        2
+                      )
+                    }%
+                  </strong>
+
+                </div>
+
+                {/* ELEVATION */}
+
+                <div className="location-factor">
+
+                  <span>
+                    🏔️ Elevation
+                  </span>
+
+                  <strong>
+                    {
+                      selectedDistrict.elevation.toFixed(
+                        0
+                      )
+                    } m
+                  </strong>
+
+                </div>
+
+                {/* TEMPERATURE */}
+
+                <div className="location-factor">
+
+                  <span>
+                    🌡️ Temperature
+                  </span>
+
+                  <strong>
+                    {
+                      selectedDistrict.temperature.toFixed(
+                        1
+                      )
+                    } °C
+                  </strong>
+
+                </div>
+
+                {/* NDVI */}
+
+                <div className="location-factor">
+
+                  <span>
+                    🛰️ NDVI
+                  </span>
+
+                  <strong>
+                    {
+                      selectedDistrict.ndvi.toFixed(
+                        4
+                      )
+                    }
+                  </strong>
+
+                </div>
+
+                {/* MODEL */}
+
+                <div className="location-factor">
+
+                  <span>
+                    🤖 AI Model
+                  </span>
+
+                  <strong>
+                    Random Forest
+                  </strong>
+
+                </div>
+
+                {/* SOURCE */}
+
+                <div className="location-factor">
+
+                  <span>
+                    🌧️ Rainfall Source
+                  </span>
+
+                  <strong>
+                    IMD
+                  </strong>
+
+                </div>
+
               </>
             )}
 
-            {/* Analyze Location */}
+            {/* ==================================================
+                ANALYZE DISTRICT
+            ================================================== */}
+
             <button
               className="analysis-button"
               onClick={() => {
-                if (!selectedLocation) {
-                  alert("Please select a location on the map first.");
+
+                if (!selectedDistrict) {
+
+                  alert(
+                    "Please select a district on the map first."
+                  );
+
                   return;
                 }
 
                 navigate(
                   `/scenario?location=${encodeURIComponent(
-                    selectedLocation.location
+                    selectedDistrict.district
                   )}&baselineRisk=${
-                    selectedLocation.risk_score
+                    selectedDistrict.risk_probability
                   }&rainfall=${
-                    selectedLocation.rainfall_mm
+                    selectedDistrict.rainfall_1d_mm
                   }&soilMoisture=${
-                    selectedLocation.soil_moisture
+                    selectedDistrict.soil_moisture
                   }&slope=${
-                    selectedLocation.slope_degree
+                    selectedDistrict.slope
                   }&elevation=${
-                    selectedLocation.elevation_m
+                    selectedDistrict.elevation
                   }&temperature=${
-                    selectedLocation.temperature_c
+                    selectedDistrict.temperature
                   }`
                 );
+
               }}
             >
-              Analyze Location →
+              Analyze District →
             </button>
 
           </div>
+
         </aside>
 
-        {/* Map */}
+        {/* ==================================================
+            MAP
+        ================================================== */}
+
         <div className="map-wrapper">
 
           <MapContainer
-            center={[31.8, 77.5]}
-            zoom={7}
+            center={[
+              27.5,
+              93.5,
+            ]}
+            zoom={6}
             scrollWheelZoom={true}
             className="leaflet-map"
           >
@@ -317,106 +1097,495 @@ function RiskMap() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            {locations.map((location) => {
-              const circleColor = getRiskColor(
-                location.risk_level
-              );
+            <LayersControl
+              position="topright"
+            >
 
-              return (
-                <Fragment key={location.location}>
+              {/* ==================================================
+                  DISTRICT RISK
+              ================================================== */}
 
-                  {/* Risk Marker */}
-                  <Marker
-                    position={[
-                      location.latitude,
-                      location.longitude,
-                    ]}
-                    icon={createRiskIcon(
-                      location.risk_level
-                    )}
-                    eventHandlers={{
-                      click: () =>
-                        setSelectedLocation(location),
-                    }}
-                  >
-                    <Tooltip permanent direction="top">
-                      <strong>
-                        {location.location} —{" "}
-                        {location.risk_score}%
-                      </strong>
-                    </Tooltip>
-                  </Marker>
+              <LayersControl.Overlay
+                checked
+                name="District Landslide Risk"
+              >
 
-                  {/* Risk Circle */}
-                  <Circle
-                    center={[
-                      location.latitude,
-                      location.longitude,
-                    ]}
-                    radius={18000}
-                    eventHandlers={{
-                      click: () =>
-                        setSelectedLocation(location),
-                    }}
-                    pathOptions={{
-                      color: circleColor,
-                      fillColor: circleColor,
-                      fillOpacity: 0.3,
-                      weight: 2,
-                    }}
-                  >
-                    <Popup>
-                      <strong>{location.location}</strong>
+                <LayerGroup>
 
-                      <br />
+                  {nerGeoJson.features.map(
+                    (
+                      feature: any,
+                      index: number
+                    ) => {
 
-                      Risk Level: {location.risk_level}
+                      const districtName =
+                        feature.properties?.district ||
+                        feature.properties?.DISTRICT ||
+                        feature.properties?.District ||
+                        "";
 
-                      <br />
+                      const stateName =
+                        feature.properties?.st_nm ||
+                        feature.properties?.STATE ||
+                        feature.properties?.state ||
+                        "";
 
-                      Risk Score: {location.risk_score}%
+                      const districtData =
+                        getDistrictData(
+                          stateName,
+                          districtName
+                        );
 
-                      <br />
+                      const hasData =
+                        !!districtData;
 
-                      Rainfall: {location.rainfall_mm} mm
+                      const riskLevel =
+                        districtData?.risk_level ||
+                        "UNAVAILABLE";
 
-                      <br />
+                      const riskColor =
+                        getRiskColor(
+                          riskLevel
+                        );
 
-                      Soil Moisture:{" "}
-                      {location.soil_moisture}%
+                      const center =
+                        getDistrictCenter(
+                          feature
+                        );
 
-                      <br />
+                      return (
+                        <div
+                          key={`${stateName}-${districtName}-${index}`}
+                        >
 
-                      Slope: {location.slope_degree}°
+                          {/* ==================================================
+                              DISTRICT POLYGON
+                          ================================================== */}
 
-                      <br />
+                          <GeoJSON
+                            data={feature}
 
-                      Elevation: {location.elevation_m} m
+                            style={() => ({
+                              color:
+                                "#1e293b",
 
-                      <br />
+                              weight:
+                                hasData
+                                  ? 1.5
+                                  : 1,
 
-                      Temperature:{" "}
-                      {location.temperature_c} °C
-                    </Popup>
-                  </Circle>
+                              fillColor:
+                                riskColor,
 
-                </Fragment>
-              );
-            })}
+                              fillOpacity:
+                                hasData
+                                  ? 0.58
+                                  : 0.12,
+                            })}
+
+                            eventHandlers={{
+                              click: () => {
+
+                                if (
+                                  districtData
+                                ) {
+
+                                  setSelectedDistrict(
+                                    districtData
+                                  );
+
+                                }
+
+                              },
+
+                              mouseover: (
+                                event
+                              ) => {
+
+                                event.target.setStyle({
+                                  weight: 3,
+
+                                  fillOpacity:
+                                    hasData
+                                      ? 0.8
+                                      : 0.25,
+                                });
+
+                              },
+
+                              mouseout: (
+                                event
+                              ) => {
+
+                                event.target.setStyle({
+                                  weight:
+                                    hasData
+                                      ? 1.5
+                                      : 1,
+
+                                  fillOpacity:
+                                    hasData
+                                      ? 0.58
+                                      : 0.12,
+                                });
+
+                              },
+                            }}
+                          />
+
+                          {/* ==================================================
+                              DISTRICT POINT
+                          ================================================== */}
+
+                          {districtData &&
+                            center && (
+
+                              <Marker
+                                position={
+                                  center
+                                }
+
+                                icon={
+                                  createRiskIcon(
+                                    districtData.risk_level
+                                  )
+                                }
+
+                                eventHandlers={{
+                                  click: () =>
+                                    setSelectedDistrict(
+                                      districtData
+                                    ),
+                                }}
+                              >
+
+                                <Tooltip
+                                  direction="top"
+                                  offset={[
+                                    0,
+                                    -10,
+                                  ]}
+                                >
+
+                                  <strong>
+                                    {
+                                      districtName
+                                    }
+                                  </strong>
+
+                                  <br />
+
+                                  {
+                                    districtData.risk_level
+                                  }
+
+                                  {" — "}
+
+                                  {
+                                    districtData.risk_probability
+                                  }%
+
+                                </Tooltip>
+
+                                <Popup>
+
+                                  <strong>
+                                    {
+                                      districtName
+                                    }
+                                  </strong>
+
+                                  <br />
+
+                                  State:
+                                  {" "}
+                                  {
+                                    stateName
+                                  }
+
+                                  <br />
+
+                                  Risk:
+                                  {" "}
+                                  <strong>
+                                    {
+                                      districtData.risk_level
+                                    }
+                                  </strong>
+
+                                  <br />
+
+                                  Probability:
+                                  {" "}
+                                  {
+                                    districtData.risk_probability
+                                  }%
+
+                                  <br />
+
+                                  1-Day Rainfall:
+                                  {" "}
+                                  {
+                                    districtData.rainfall_1d_mm
+                                  }{" "}
+                                  mm
+
+                                  <br />
+
+                                  3-Day Rainfall:
+                                  {" "}
+                                  {
+                                    districtData.rainfall_3d_mm
+                                  }{" "}
+                                  mm
+
+                                  <br />
+
+                                  7-Day Rainfall:
+                                  {" "}
+                                  {
+                                    districtData.rainfall_7d_mm
+                                  }{" "}
+                                  mm
+
+                                  <br />
+
+                                  15-Day Rainfall:
+                                  {" "}
+                                  {
+                                    districtData.rainfall_15d_mm
+                                  }{" "}
+                                  mm
+
+                                  <br />
+
+                                  Slope:
+                                  {" "}
+                                  {
+                                    districtData.slope.toFixed(
+                                      2
+                                    )
+                                  }°
+
+                                  <br />
+
+                                  Soil Moisture:
+                                  {" "}
+                                  {
+                                    districtData.soil_moisture.toFixed(
+                                      2
+                                    )
+                                  }%
+
+                                  <br />
+
+                                  Elevation:
+                                  {" "}
+                                  {
+                                    districtData.elevation.toFixed(
+                                      0
+                                    )
+                                  }{" "}
+                                  m
+
+                                  <br />
+
+                                  Temperature:
+                                  {" "}
+                                  {
+                                    districtData.temperature.toFixed(
+                                      1
+                                    )
+                                  }{" "}
+                                  °C
+
+                                  <br />
+
+                                  NDVI:
+                                  {" "}
+                                  {
+                                    districtData.ndvi.toFixed(
+                                      4
+                                    )
+                                  }
+
+                                  <br />
+
+                                  <small>
+                                    🤖 Random Forest
+                                    + IMD Rainfall
+                                  </small>
+
+                                </Popup>
+
+                              </Marker>
+
+                            )}
+
+                        </div>
+                      );
+                    }
+                  )}
+
+                </LayerGroup>
+
+              </LayersControl.Overlay>
+
+              {/* ==================================================
+                  ROAD CONNECTIVITY
+              ================================================== */}
+
+              <LayersControl.Overlay
+                checked
+                name="Road Connectivity"
+              >
+
+                <LayerGroup>
+
+                  {roads.map(
+                    (road) => {
+
+                      const roadColor =
+                        getRiskColor(
+                          road.risk_level
+                        );
+
+                      return (
+
+                        <Polyline
+                          key={`road-${road.id}`}
+                          positions={
+                            road.coordinates
+                          }
+
+                          pathOptions={{
+                            color:
+                              roadColor,
+
+                            weight: 6,
+
+                            opacity: 0.85,
+                          }}
+                        >
+
+                          <Popup>
+
+                            <strong>
+                              🛣️{" "}
+                              {road.name}
+                            </strong>
+
+                            <br />
+
+                            Road Status:
+                            {" "}
+                            <strong>
+                              {road.status}
+                            </strong>
+
+                            <br />
+
+                            Risk Level:
+                            {" "}
+                            <strong>
+                              {road.risk_level}
+                            </strong>
+
+                          </Popup>
+
+                        </Polyline>
+
+                      );
+                    }
+                  )}
+
+                </LayerGroup>
+
+              </LayersControl.Overlay>
+
+              {/* ==================================================
+                  DISTRICT BOUNDARIES
+              ================================================== */}
+
+              <LayersControl.Overlay
+                checked
+                name="District Boundaries"
+              >
+
+                <GeoJSON
+                  data={
+                    nerGeoJson as any
+                  }
+
+                  style={() => ({
+                    color:
+                      "#0f172a",
+
+                    weight: 1,
+
+                    fillOpacity: 0,
+                  })}
+
+                  onEachFeature={(
+                    feature,
+                    layer
+                  ) => {
+
+                    const district =
+                      feature.properties?.district ||
+                      "Unknown District";
+
+                    const state =
+                      feature.properties?.st_nm ||
+                      "Northeastern State";
+
+                    layer.bindTooltip(
+                      `${district}, ${state}`
+                    );
+
+                  }}
+                />
+
+              </LayersControl.Overlay>
+
+            </LayersControl>
 
           </MapContainer>
 
-          {/* Map Information */}
+          {/* ==================================================
+              MAP INFO
+          ================================================== */}
+
           <div className="map-info">
-            <strong>⚠️ Prototype Map</strong>
+
+            <strong>
+              🗺️ District-Level AI Risk Map
+            </strong>
 
             <span>
-              Risk zones are currently based on simulated demo data.
+
+              🟢 Low &nbsp;&nbsp;
+
+              🟡 Medium &nbsp;&nbsp;
+
+              🔴 High &nbsp;&nbsp;
+
+              ⚪ No Data
+
+              <br />
+
+              Click a district point or
+              district boundary to view
+              its latest risk assessment.
+
             </span>
+
           </div>
 
         </div>
+
       </div>
+
     </div>
   );
 }

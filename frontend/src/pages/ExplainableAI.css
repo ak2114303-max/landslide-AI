@@ -1,0 +1,383 @@
+.explainable-page {
+  min-height: 100vh;
+  padding: 32px 38px;
+  background: #f5f7fb;
+  color: #172033;
+  box-sizing: border-box;
+}
+
+.explainable-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.explainable-header h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  font-weight: 750;
+}
+
+.explainable-header p {
+  margin: 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+.model-badge {
+  padding: 11px 18px;
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  font-weight: 600;
+  color: #344054;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.04);
+}
+
+/* Common card */
+
+.explainable-card {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 3px 12px rgba(16, 24, 40, 0.05);
+}
+
+/* District selection */
+
+.selection-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.selection-card h2 {
+  margin: 0 0 6px;
+  font-size: 19px;
+}
+
+.selection-card p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.selection-card select {
+  width: 280px;
+  padding: 12px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #344054;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.selection-card select:focus {
+  border-color: #667085;
+}
+
+/* Summary */
+
+.explainable-summary {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.summary-main,
+.summary-stat {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 3px 12px rgba(16, 24, 40, 0.05);
+}
+
+.summary-label {
+  display: block;
+  color: #667085;
+  font-size: 13px;
+  margin-bottom: 7px;
+}
+
+.risk-value {
+  font-size: 29px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.risk-value.high {
+  color: #dc2626;
+}
+
+.risk-value.medium {
+  color: #d97706;
+}
+
+.risk-value.low {
+  color: #16a34a;
+}
+
+.summary-main p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.summary-stat span {
+  color: #667085;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.summary-stat strong {
+  font-size: 23px;
+  color: #172033;
+}
+
+/* Risk Factors */
+
+.explanation-section {
+  margin-bottom: 28px;
+}
+
+.section-heading {
+  margin-bottom: 16px;
+}
+
+.section-heading h2 {
+  margin: 0 0 5px;
+  font-size: 21px;
+}
+
+.section-heading p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.factor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.factor-card {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 3px 10px rgba(16, 24, 40, 0.04);
+}
+
+.factor-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.factor-top h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.impact-badge {
+  white-space: nowrap;
+  padding: 5px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.impact-badge.high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.impact-badge.medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.impact-badge.low {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.factor-value {
+  margin: 17px 0 10px;
+  font-size: 25px;
+  font-weight: 750;
+  color: #172033;
+}
+
+.factor-card p {
+  margin: 0;
+  color: #667085;
+  line-height: 1.55;
+  font-size: 12.5px;
+}
+
+/* Model explanation */
+
+.model-explanation {
+  margin-bottom: 24px;
+}
+
+.model-explanation h2 {
+  margin: 0 0 22px;
+  font-size: 21px;
+}
+
+.workflow {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.workflow-step {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #eaecf0;
+  border-radius: 12px;
+}
+
+.workflow-step > span {
+  min-width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #172033;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.workflow-step strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.workflow-step p {
+  margin: 0;
+  color: #667085;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.workflow-arrow {
+  display: flex;
+  align-items: center;
+  color: #98a2b3;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Prototype notice */
+
+.prototype-notice {
+  display: flex;
+  gap: 13px;
+  padding: 17px 20px;
+  background: #f8fafc;
+  border: 1px solid #d0d5dd;
+  border-radius: 13px;
+}
+
+.prototype-notice > span {
+  font-size: 20px;
+}
+
+.prototype-notice strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.prototype-notice p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Responsive */
+
+@media (max-width: 1100px) {
+  .explainable-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .factor-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .workflow {
+    flex-wrap: wrap;
+  }
+
+  .workflow-step {
+    min-width: calc(50% - 30px);
+  }
+
+  .workflow-arrow {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .explainable-page {
+    padding: 22px 16px;
+  }
+
+  .explainable-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .selection-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .selection-card select {
+    width: 100%;
+  }
+
+  .explainable-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .factor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow {
+    flex-direction: column;
+  }
+
+  .workflow-step {
+    min-width: 0;
+  }
+}

@@ -1,87 +1,131 @@
-
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Dashboard.css";
 
-interface LocationData {
-  location: string;
-  risk_score: number;
-  risk_level: string;
-  rainfall_mm: number;
+const API_BASE = "http://127.0.0.1:8000";
+
+interface DistrictRisk {
+  state: string;
+  district: string;
+  date: string;
+  rainfall_1d_mm: number;
+  rainfall_3d_mm: number;
+  rainfall_7d_mm: number;
+  rainfall_15d_mm: number;
+  elevation: number;
+  slope: number;
   soil_moisture: number;
-  slope_degree: number;
-  elevation_m: number;
-  temperature_c: number;
+  temperature: number;
+  ndvi: number;
+  risk_level: string;
+  risk_probability: number;
 }
 
-interface SummaryData {
-  monitored_locations: number;
-  high_risk_zones: number;
-  active_alerts: number;
-  infrastructure_at_risk: number;
+interface DistrictResponse {
+  success: boolean;
+  total_districts: number;
+  data: DistrictRisk[];
+}
+
+interface SummaryResponse {
+  success: boolean;
+  total_districts: number;
+  low_risk: number;
+  medium_risk: number;
+  high_risk: number;
 }
 
 function Dashboard() {
   const navigate = useNavigate();
 
-  const [summary, setSummary] = useState<SummaryData>({
-    monitored_locations: 0,
-    high_risk_zones: 0,
-    active_alerts: 0,
-    infrastructure_at_risk: 0,
-  });
+  const [districts, setDistricts] =
+    useState<DistrictRisk[]>([]);
 
-  const [locations, setLocations] = useState<LocationData[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedState, setSelectedState] =
+    useState("");
 
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [apiOnline, setApiOnline] = useState(true);
+  const [selectedDistrict, setSelectedDistrict] =
+    useState("");
 
-  const selectedLocation = locations[selectedIndex];
+  const [lastUpdated, setLastUpdated] =
+    useState<Date | null>(null);
 
-  const riskCounts = {
-    low: locations.filter(
-      (location) => location.risk_level === "Low"
-    ).length,
+  const [isRefreshing, setIsRefreshing] =
+    useState(false);
 
-    moderate: locations.filter(
-      (location) => location.risk_level === "Moderate"
-    ).length,
+  const [apiOnline, setApiOnline] =
+    useState(true);
 
-    high: locations.filter(
-      (location) => location.risk_level === "High"
-    ).length,
+  // --------------------------------
+  // Load district data
+  // --------------------------------
 
-    critical: locations.filter(
-      (location) => location.risk_level === "Critical"
-    ).length,
-  };
-
-  const loadDashboardData = async (showLoading = false) => {
+  const loadDashboardData = async (
+    showLoading = false
+  ) => {
     if (showLoading) {
       setIsRefreshing(true);
     }
 
     try {
-      const [summaryResponse, locationsResponse] = await Promise.all([
-        axios.get("http://127.0.0.1:8000/api/risk-summary"),
-        axios.get("http://127.0.0.1:8000/api/locations"),
+      const [
+        districtResponse,
+        summaryResponse,
+      ] = await Promise.all([
+        axios.get<DistrictResponse>(
+          `${API_BASE}/api/districts`
+        ),
+
+        axios.get<SummaryResponse>(
+          `${API_BASE}/api/district-risk-summary`
+        ),
       ]);
 
-      setSummary(summaryResponse.data);
-      setLocations(locationsResponse.data);
+      if (districtResponse.data.success) {
+        const data =
+          districtResponse.data.data;
+
+        setDistricts(data);
+
+        if (
+          data.length > 0 &&
+          !selectedState
+        ) {
+          const first = data[0];
+
+          setSelectedState(
+            first.state
+          );
+
+          setSelectedDistrict(
+            first.district
+          );
+        }
+      }
+
+      console.log(
+        "District summary:",
+        summaryResponse.data
+      );
 
       setLastUpdated(new Date());
       setApiOnline(true);
     } catch (error) {
-      console.error("Dashboard API error:", error);
+      console.error(
+        "Dashboard API error:",
+        error
+      );
+
       setApiOnline(false);
     } finally {
       setIsRefreshing(false);
     }
   };
+
+  // --------------------------------
+  // Initial load + auto refresh
+  // --------------------------------
 
   useEffect(() => {
     loadDashboardData();
@@ -90,98 +134,259 @@ function Dashboard() {
       loadDashboardData();
     }, 30000);
 
-    return () => clearInterval(interval);
+    return () =>
+      clearInterval(interval);
   }, []);
 
-  const getAlertTitle = (location: LocationData) => {
-    if (location.risk_level === "Critical") {
-      return "Critical landslide risk";
+  // --------------------------------
+  // States
+  // --------------------------------
+
+  const states = useMemo(() => {
+    return Array.from(
+      new Set(
+        districts.map(
+          (item) => item.state
+        )
+      )
+    ).sort();
+  }, [districts]);
+
+  // --------------------------------
+  // Districts for selected state
+  // --------------------------------
+
+  const stateDistricts = useMemo(() => {
+    if (!selectedState) {
+      return [];
     }
 
-    if (location.risk_level === "High") {
-      return "High landslide risk";
-    }
+    return districts
+      .filter(
+        (item) =>
+          item.state === selectedState
+      )
+      .sort((a, b) =>
+        a.district.localeCompare(
+          b.district
+        )
+      );
+  }, [
+    districts,
+    selectedState,
+  ]);
 
-    if (location.risk_level === "Moderate") {
-      return "Moderate landslide risk";
-    }
+  // --------------------------------
+  // Current selected district
+  // --------------------------------
 
-    return "Low landslide risk";
+  const currentDistrict =
+    districts.find(
+      (item) =>
+        item.state === selectedState &&
+        item.district === selectedDistrict
+    );
+
+  // --------------------------------
+  // State change
+  // --------------------------------
+
+  const handleStateChange = (
+    state: string
+  ) => {
+    setSelectedState(state);
+
+    const firstDistrict =
+      districts
+        .filter(
+          (item) =>
+            item.state === state
+        )
+        .sort((a, b) =>
+          a.district.localeCompare(
+            b.district
+          )
+        )[0];
+
+    if (firstDistrict) {
+      setSelectedDistrict(
+        firstDistrict.district
+      );
+    } else {
+      setSelectedDistrict("");
+    }
   };
 
-  const getAlertSymbol = (riskLevel: string) => {
-    if (
-      riskLevel === "Critical" ||
-      riskLevel === "High" ||
-      riskLevel === "Moderate"
-    ) {
-      return "!";
-    }
+  // --------------------------------
+  // District change
+  // --------------------------------
 
-    return "i";
+  const handleDistrictChange = (
+    district: string
+  ) => {
+    setSelectedDistrict(district);
   };
 
-  const getAlertClass = (riskLevel: string) => {
-    if (riskLevel === "Critical") {
-      return "critical";
+  // --------------------------------
+  // Risk counts
+  // --------------------------------
+
+  const riskCounts = useMemo(() => {
+    return {
+      low: districts.filter(
+        (item) =>
+          item.risk_level === "LOW"
+      ).length,
+
+      medium: districts.filter(
+        (item) =>
+          item.risk_level === "MEDIUM"
+      ).length,
+
+      high: districts.filter(
+        (item) =>
+          item.risk_level === "HIGH"
+      ).length,
+    };
+  }, [districts]);
+
+  // --------------------------------
+  // Recent alerts
+  // --------------------------------
+
+  const recentAlerts = useMemo(() => {
+    return [...districts]
+      .filter(
+        (item) =>
+          item.risk_level ===
+            "HIGH" ||
+          item.risk_level ===
+            "MEDIUM"
+      )
+      .sort(
+        (a, b) =>
+          b.risk_probability -
+          a.risk_probability
+      )
+      .slice(0, 5);
+  }, [districts]);
+
+  // --------------------------------
+  // Risk class
+  // --------------------------------
+
+  const getRiskClass = (
+    risk: string
+  ) => {
+    if (risk === "HIGH") {
+      return "high";
     }
 
-    if (riskLevel === "High") {
-      return "warning";
+    if (risk === "MEDIUM") {
+      return "moderate";
     }
 
-    return "info";
+    return "low";
   };
 
-  const recentAlerts = [...locations]
-    .filter((location) => location.risk_level !== "Low")
-    .sort((a, b) => b.risk_score - a.risk_score)
-    .slice(0, 3);
+  // --------------------------------
+  // Risk description
+  // --------------------------------
+
+  const getRiskDescription = (
+    risk: string
+  ) => {
+    if (risk === "HIGH") {
+      return "High-risk conditions detected. Close monitoring is recommended.";
+    }
+
+    if (risk === "MEDIUM") {
+      return "Moderate-risk conditions detected. Continue regular monitoring.";
+    }
+
+    return "Low-risk conditions detected. Current conditions appear stable.";
+  };
+
+  // --------------------------------
+  // Last updated
+  // --------------------------------
 
   const formatLastUpdated = () => {
     if (!lastUpdated) {
       return "Waiting for data...";
     }
 
-    return lastUpdated.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    return lastUpdated.toLocaleTimeString(
+      [],
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }
+    );
   };
 
+  // --------------------------------
+  // Scenario
+  // --------------------------------
+
   const openScenario = () => {
-    if (!selectedLocation) {
+    if (!currentDistrict) {
       navigate("/scenario");
       return;
     }
 
     navigate(
       `/scenario?location=${encodeURIComponent(
-        selectedLocation.location
-      )}&baselineRisk=${selectedLocation.risk_score}&rainfall=${
-        selectedLocation.rainfall_mm
-      }&soilMoisture=${selectedLocation.soil_moisture}&slope=${
-        selectedLocation.slope_degree
-      }&elevation=${selectedLocation.elevation_m}&temperature=${
-        selectedLocation.temperature_c
+        currentDistrict.district
+      )}&baselineRisk=${
+        currentDistrict.risk_probability
+      }&rainfall=${
+        currentDistrict.rainfall_1d_mm
+      }&soilMoisture=${
+        currentDistrict.soil_moisture
+      }&slope=${
+        currentDistrict.slope
+      }&elevation=${
+        currentDistrict.elevation
+      }&temperature=${
+        currentDistrict.temperature
       }`
     );
+  };
+
+  // --------------------------------
+  // Logout
+  // --------------------------------
+
+  const handleLogout = () => {
+    localStorage.removeItem(
+      "landslideai_logged_in"
+    );
+
+    navigate("/login", {
+      replace: true,
+    });
   };
 
   return (
     <div className="dashboard-page">
 
-      {/* Sidebar */}
+      {/* ================= SIDEBAR ================= */}
+
       <aside className="sidebar">
 
         <div className="sidebar-logo">
-          <div className="logo-icon">🌍</div>
+
+          <div className="logo-icon">
+            🌍
+          </div>
 
           <div>
             <h2>LandslideAI</h2>
             <span>SIH26001</span>
           </div>
+
         </div>
 
         <nav className="sidebar-nav">
@@ -190,76 +395,129 @@ function Dashboard() {
             📊 Dashboard
           </a>
 
-          <a onClick={() => navigate("/risk-map")}>
+          <a
+            onClick={() =>
+              navigate("/risk-map")
+            }
+          >
             🗺️ Risk Map
           </a>
 
-          <a onClick={openScenario}>
+          <a
+            onClick={openScenario}
+          >
             📍 Location Analysis
-          </a>
-
-          <a onClick={() => navigate("/prediction")}>
-            🤖 AI Prediction
-          </a>
-
-          <a onClick={() => navigate("/prediction")}>
-            🧠 Explainable AI
           </a>
 
           <a
             onClick={() =>
-              document
-                .querySelector(".system-status")
-                ?.scrollIntoView({ behavior: "smooth" })
+              navigate("/prediction")
             }
+          >
+            🤖 AI Prediction
+          </a>
+
+          <a
+  onClick={() =>
+    navigate("/explainable-ai")
+  }
+>
+  🧠 Explainable AI
+</a>
+
+          {/* ================= LIVE MONITORING ================= */}
+
+          <a
+            onClick={() =>
+              navigate("/live-monitoring")
+            }
+            style={{
+              cursor: "pointer",
+            }}
           >
             📡 Live Monitoring
           </a>
 
-          <a>
-            <a
-  href="#"
-  onClick={(e) => {
-    e.preventDefault();
-    navigate("/historical-events");
-  }}
->
-  📜 Historical Events
-</a>
+          <a
+            onClick={() =>
+              navigate(
+                "/historical-events"
+              )
+            }
+          >
+            📜 Historical Events
           </a>
 
           <a
-  href="#"
-  onClick={(e) => {
-    e.preventDefault();
-    navigate("/infrastructure-risk");
-  }}
->
-  🏗️ Infrastructure Risk
-</a>
+            onClick={() =>
+              navigate(
+                "/infrastructure-risk"
+              )
+            }
+          >
+            🏗️ Infrastructure Risk
+          </a>
 
-          <a onClick={() => navigate("/alerts")}>
+          <a
+            onClick={() =>
+              navigate("/alerts")
+            }
+          >
             ⚠️ Alerts
+          </a>
+
+          <a
+            onClick={() =>
+              navigate(
+                "/report-landslide"
+              )
+            }
+          >
+            📸 Report a Landslide
           </a>
 
         </nav>
 
+        {/* SIDEBAR BOTTOM */}
+
         <div className="sidebar-bottom">
-          <a>⚙️ Settings</a>
-          <a>🚪 Logout</a>
+
+         <a
+  onClick={() =>
+    navigate("/settings")
+  }
+  style={{
+    cursor: "pointer",
+  }}
+>
+  ⚙️ Settings
+</a>
+
+          <a
+            onClick={handleLogout}
+            style={{
+              cursor: "pointer",
+            }}
+          >
+            🚪 Logout
+          </a>
+
         </div>
 
       </aside>
 
-      {/* Main Content */}
+      {/* ================= MAIN ================= */}
+
       <main className="dashboard-main">
 
-        {/* Header */}
+        {/* HEADER */}
+
         <header className="dashboard-header">
 
           <div>
+
             <p className="dashboard-label">
-              DISASTER MANAGEMENT
+              NORTH EASTERN REGION
             </p>
 
             <h1>
@@ -267,8 +525,11 @@ function Dashboard() {
             </h1>
 
             <p className="dashboard-subtitle">
-              Real-time landslide risk overview and environmental monitoring.
+              District-level landslide risk
+              monitoring across all 8 NER
+              states.
             </p>
+
           </div>
 
           <div className="user-profile">
@@ -278,44 +539,58 @@ function Dashboard() {
             </div>
 
             <div className="avatar">
-              AG
+              AI
             </div>
 
             <div>
-              <strong>Anuj Gangwar</strong>
-              <span>Administrator</span>
+              <strong>
+                Administrator
+              </strong>
             </div>
 
           </div>
 
         </header>
 
-        {/* Live System Status */}
-        <div className={`system-status ${apiOnline ? "online" : "offline"}`}>
+        {/* ================= SYSTEM STATUS ================= */}
+
+        <div
+          className={`system-status ${
+            apiOnline
+              ? "online"
+              : "offline"
+          }`}
+        >
 
           <span className="status-dot"></span>
 
           <strong>
             {apiOnline
-              ? "Live Monitoring Active"
+              ? "Live District Monitoring Active"
               : "Monitoring Connection Lost"}
           </strong>
 
           <span className="status-time">
-            Last updated: {formatLastUpdated()}
+            Last updated:{" "}
+            {formatLastUpdated()}
           </span>
 
           <button
             className="refresh-button"
-            onClick={() => loadDashboardData(true)}
+            onClick={() =>
+              loadDashboardData(true)
+            }
             disabled={isRefreshing}
           >
-            {isRefreshing ? "Refreshing..." : "↻ Refresh"}
+            {isRefreshing
+              ? "Refreshing..."
+              : "↻ Refresh"}
           </button>
 
         </div>
 
-        {/* Statistics */}
+        {/* ================= STATISTICS ================= */}
+
         <section className="stats-grid">
 
           <div className="stat-card">
@@ -325,17 +600,19 @@ function Dashboard() {
             </div>
 
             <div>
+
               <span>
-                Monitored Locations
+                Monitored Districts
               </span>
 
               <strong>
-                {summary.monitored_locations.toLocaleString()}
+                {districts.length}
               </strong>
 
               <small>
-                Active monitoring
+                Across 8 NER states
               </small>
+
             </div>
 
           </div>
@@ -343,21 +620,23 @@ function Dashboard() {
           <div className="stat-card">
 
             <div className="stat-icon orange">
-              ⚠️
+              🟡
             </div>
 
             <div>
+
               <span>
-                High Risk Zones
+                Medium Risk
               </span>
 
               <strong>
-                {summary.high_risk_zones}
+                {riskCounts.medium}
               </strong>
 
               <small>
-                Elevated risk detected
+                Districts
               </small>
+
             </div>
 
           </div>
@@ -365,21 +644,24 @@ function Dashboard() {
           <div className="stat-card">
 
             <div className="stat-icon red">
-              🚨
+              🔴
             </div>
 
             <div>
+
               <span>
-                Active Alerts
+                High Risk
               </span>
 
               <strong>
-                {summary.active_alerts}
+                {riskCounts.high}
               </strong>
 
               <small>
-                Requires attention
+                Districts requiring
+                attention
               </small>
+
             </div>
 
           </div>
@@ -387,62 +669,230 @@ function Dashboard() {
           <div className="stat-card">
 
             <div className="stat-icon blue">
-              🏗️
+              🟢
             </div>
 
             <div>
+
               <span>
-                Infrastructure at Risk
+                Low Risk
               </span>
 
               <strong>
-                {summary.infrastructure_at_risk}
+                {riskCounts.low}
               </strong>
 
               <small>
-                Across monitored regions
+                Stable districts
               </small>
+
             </div>
 
           </div>
 
         </section>
 
-        {/* Main Dashboard Cards */}
+        {/* ================= MAIN GRID ================= */}
+
         <section className="dashboard-grid">
 
-          {/* Risk Overview */}
+          {/* ================= RISK OVERVIEW ================= */}
+
           <div className="dashboard-card risk-overview">
 
             <div className="card-header">
 
               <div>
+
                 <h2>
-                  Current Risk Overview
+                  District Risk Overview
                 </h2>
 
                 <p>
-                  Overall regional landslide risk assessment
+                  Select a state and district
+                  to view current AI risk
+                  assessment.
                 </p>
+
               </div>
 
               <div className="card-actions">
 
                 <button
-                  onClick={() => navigate("/risk-map")}
+                  onClick={() =>
+                    navigate(
+                      "/risk-map"
+                    )
+                  }
                 >
                   View Map →
                 </button>
 
                 <button
-                  onClick={openScenario}
+                  onClick={
+                    openScenario
+                  }
                 >
-                  Analyze Location →
+                  Analyze →
                 </button>
 
               </div>
 
             </div>
+
+            {/* STATE + DISTRICT */}
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "1fr 1fr",
+                gap: "15px",
+                marginBottom:
+                  "25px",
+              }}
+            >
+
+              {/* STATE */}
+
+              <div>
+
+                <label
+                  style={{
+                    display:
+                      "block",
+                    marginBottom:
+                      "7px",
+                    fontWeight:
+                      600,
+                  }}
+                >
+                  Select State
+                </label>
+
+                <select
+                  value={selectedState}
+                  onChange={(e) =>
+                    handleStateChange(
+                      e.target.value
+                    )
+                  }
+                  style={{
+                    width: "100%",
+                    padding:
+                      "12px",
+                    borderRadius:
+                      "8px",
+                    border:
+                      "1px solid #d1d5db",
+                    background:
+                      "white",
+                    fontSize:
+                      "14px",
+                    cursor:
+                      "pointer",
+                  }}
+                >
+
+                  <option value="">
+                    Select State
+                  </option>
+
+                  {states.map(
+                    (state) => (
+                      <option
+                        key={state}
+                        value={state}
+                      >
+                        {state}
+                      </option>
+                    )
+                  )}
+
+                </select>
+
+              </div>
+
+              {/* DISTRICT */}
+
+              <div>
+
+                <label
+                  style={{
+                    display:
+                      "block",
+                    marginBottom:
+                      "7px",
+                    fontWeight:
+                      600,
+                  }}
+                >
+                  Select District
+                </label>
+
+                <select
+                  value={
+                    selectedDistrict
+                  }
+                  onChange={(e) =>
+                    handleDistrictChange(
+                      e.target.value
+                    )
+                  }
+                  disabled={
+                    !selectedState
+                  }
+                  style={{
+                    width: "100%",
+                    padding:
+                      "12px",
+                    borderRadius:
+                      "8px",
+                    border:
+                      "1px solid #d1d5db",
+                    background:
+                      selectedState
+                        ? "white"
+                        : "#f3f4f6",
+                    fontSize:
+                      "14px",
+                    cursor:
+                      selectedState
+                        ? "pointer"
+                        : "not-allowed",
+                  }}
+                >
+
+                  {!selectedState ? (
+                    <option value="">
+                      Select state first
+                    </option>
+                  ) : (
+                    stateDistricts.map(
+                      (district) => (
+                        <option
+                          key={
+                            district.district
+                          }
+                          value={
+                            district.district
+                          }
+                        >
+                          {
+                            district.district
+                          }
+                        </option>
+                      )
+                    )
+                  )}
+
+                </select>
+
+              </div>
+
+            </div>
+
+            {/* ================= RISK CONTENT ================= */}
 
             <div className="risk-content">
 
@@ -450,21 +900,23 @@ function Dashboard() {
 
                 <div
                   className={`risk-circle ${
-                    selectedLocation
-                      ? selectedLocation.risk_level.toLowerCase()
+                    currentDistrict
+                      ? getRiskClass(
+                          currentDistrict.risk_level
+                        )
                       : ""
                   }`}
                 >
 
                   <strong>
-                    {selectedLocation
-                      ? `${selectedLocation.risk_score}%`
+                    {currentDistrict
+                      ? `${currentDistrict.risk_probability}%`
                       : "0%"}
                   </strong>
 
                   <span>
-                    {selectedLocation
-                      ? `${selectedLocation.risk_level.toUpperCase()} RISK`
+                    {currentDistrict
+                      ? `${currentDistrict.risk_level} RISK`
                       : "NO DATA"}
                   </span>
 
@@ -472,61 +924,78 @@ function Dashboard() {
 
               </div>
 
-              {/* Location Selector */}
-              <select
-                value={selectedIndex}
-                onChange={(e) =>
-                  setSelectedIndex(Number(e.target.value))
-                }
-              >
-
-                {locations.length === 0 ? (
-                  <option value={0}>
-                    Loading locations...
-                  </option>
-                ) : (
-                  locations.map((location, index) => (
-                    <option
-                      key={location.location}
-                      value={index}
-                    >
-                      {location.location}
-                    </option>
-                  ))
-                )}
-
-              </select>
-
               <div className="risk-details">
 
                 <h3>
-                  {selectedLocation
-                    ? selectedLocation.location
-                    : "Loading..."}
+
+                  {currentDistrict
+                    ? `${currentDistrict.district}, ${currentDistrict.state}`
+                    : "Select a district"}
+
                 </h3>
 
                 <p>
-                  {selectedLocation
-                    ? selectedLocation.risk_level === "Critical"
-                      ? "Critical conditions detected. Immediate monitoring and preventive action are recommended."
-                      : selectedLocation.risk_level === "High"
-                      ? "High-risk conditions detected. Close monitoring is recommended."
-                      : selectedLocation.risk_level === "Moderate"
-                      ? "Moderate-risk conditions detected. Continue regular monitoring."
-                      : "Low-risk conditions detected. Current conditions appear stable."
-                    : "Loading risk information..."}
+
+                  {currentDistrict
+                    ? getRiskDescription(
+                        currentDistrict.risk_level
+                      )
+                    : "Select a state and district to view risk information."}
+
                 </p>
 
                 <div className="factor">
 
                   <span>
-                    🌧️ Rainfall
+                    🌧️ 1-Day Rainfall
                   </span>
 
                   <strong>
-                    {selectedLocation
-                      ? `${selectedLocation.rainfall_mm} mm`
-                      : "Loading..."}
+                    {currentDistrict
+                      ? `${currentDistrict.rainfall_1d_mm} mm`
+                      : "--"}
+                  </strong>
+
+                </div>
+
+                <div className="factor">
+
+                  <span>
+                    🌧️ 3-Day Rainfall
+                  </span>
+
+                  <strong>
+                    {currentDistrict
+                      ? `${currentDistrict.rainfall_3d_mm} mm`
+                      : "--"}
+                  </strong>
+
+                </div>
+
+                <div className="factor">
+
+                  <span>
+                    🌧️ 7-Day Rainfall
+                  </span>
+
+                  <strong>
+                    {currentDistrict
+                      ? `${currentDistrict.rainfall_7d_mm} mm`
+                      : "--"}
+                  </strong>
+
+                </div>
+
+                <div className="factor">
+
+                  <span>
+                    🌧️ 15-Day Rainfall
+                  </span>
+
+                  <strong>
+                    {currentDistrict
+                      ? `${currentDistrict.rainfall_15d_mm} mm`
+                      : "--"}
                   </strong>
 
                 </div>
@@ -538,9 +1007,9 @@ function Dashboard() {
                   </span>
 
                   <strong>
-                    {selectedLocation
-                      ? `${selectedLocation.slope_degree}°`
-                      : "Loading..."}
+                    {currentDistrict
+                      ? `${currentDistrict.slope}°`
+                      : "--"}
                   </strong>
 
                 </div>
@@ -552,9 +1021,9 @@ function Dashboard() {
                   </span>
 
                   <strong>
-                    {selectedLocation
-                      ? `${selectedLocation.soil_moisture}%`
-                      : "Loading..."}
+                    {currentDistrict
+                      ? currentDistrict.soil_moisture
+                      : "--"}
                   </strong>
 
                 </div>
@@ -565,30 +1034,39 @@ function Dashboard() {
 
           </div>
 
-          {/* Recent Alerts */}
+          {/* ================= RECENT ALERTS ================= */}
+
           <div className="dashboard-card alerts-card">
 
             <div className="card-header">
 
               <div>
+
                 <h2>
                   Recent Alerts
                 </h2>
 
                 <p>
-                  Latest risk notifications
+                  Latest district risk
+                  notifications
                 </p>
+
               </div>
 
               <button
-                onClick={() => navigate("/alerts")}
+                onClick={() =>
+                  navigate(
+                    "/alerts"
+                  )
+                }
               >
                 View All →
               </button>
 
             </div>
 
-            {recentAlerts.length === 0 ? (
+            {recentAlerts.length ===
+            0 ? (
 
               <div className="alert-item info">
 
@@ -597,46 +1075,69 @@ function Dashboard() {
                 </span>
 
                 <div>
+
                   <strong>
-                    No active risk alerts
+                    No active alerts
                   </strong>
 
                   <p>
-                    All monitored locations are currently stable.
+                    All monitored
+                    districts are
+                    currently stable.
                   </p>
+
                 </div>
 
               </div>
 
             ) : (
 
-              recentAlerts.map((location) => (
+              recentAlerts.map(
+                (district) => (
 
-                <div
-                  className={`alert-item ${getAlertClass(
-                    location.risk_level
-                  )}`}
-                  key={location.location}
-                >
+                  <div
+                    className={`alert-item ${
+                      district.risk_level ===
+                      "HIGH"
+                        ? "warning"
+                        : "info"
+                    }`}
+                    key={`${district.state}-${district.district}`}
+                  >
 
-                  <span className="alert-symbol">
-                    {getAlertSymbol(location.risk_level)}
-                  </span>
+                    <span className="alert-symbol">
+                      !
+                    </span>
 
-                  <div>
-                    <strong>
-                      {getAlertTitle(location)}
-                    </strong>
+                    <div>
 
-                    <p>
-                      {location.location} • Risk score:{" "}
-                      {location.risk_score}%
-                    </p>
+                      <strong>
+                        {district.risk_level ===
+                        "HIGH"
+                          ? "High landslide risk"
+                          : "Medium landslide risk"}
+                      </strong>
+
+                      <p>
+                        {
+                          district.district
+                        }
+                        ,{" "}
+                        {
+                          district.state
+                        }{" "}
+                        • Probability:{" "}
+                        {
+                          district.risk_probability
+                        }%
+                      </p>
+
+                    </div>
+
                   </div>
 
-                </div>
-
-              ))
+                )
+              )
 
             )}
 
@@ -644,24 +1145,30 @@ function Dashboard() {
 
         </section>
 
-        {/* Risk Distribution */}
+        {/* ================= RISK DISTRIBUTION ================= */}
+
         <section className="dashboard-card risk-distribution-card">
 
           <div className="card-header">
 
             <div>
+
               <h2>
                 Risk Distribution
               </h2>
 
               <p>
-                Current risk levels across monitored locations
+                Current risk levels across
+                all monitored districts
               </p>
+
             </div>
 
           </div>
 
           <div className="risk-distribution">
+
+            {/* LOW */}
 
             <div className="distribution-item low">
 
@@ -682,27 +1189,31 @@ function Dashboard() {
                 <div
                   style={{
                     width: `${
-                      locations.length > 0
-                        ? (riskCounts.low / locations.length) * 100
+                      districts.length
+                        ? (riskCounts.low /
+                            districts.length) *
+                          100
                         : 0
                     }%`,
                   }}
-                ></div>
+                />
 
               </div>
 
             </div>
+
+            {/* MEDIUM */}
 
             <div className="distribution-item moderate">
 
               <div className="distribution-top">
 
                 <span>
-                  🟡 Moderate Risk
+                  🟡 Medium Risk
                 </span>
 
                 <strong>
-                  {riskCounts.moderate}
+                  {riskCounts.medium}
                 </strong>
 
               </div>
@@ -712,23 +1223,27 @@ function Dashboard() {
                 <div
                   style={{
                     width: `${
-                      locations.length > 0
-                        ? (riskCounts.moderate / locations.length) * 100
+                      districts.length
+                        ? (riskCounts.medium /
+                            districts.length) *
+                          100
                         : 0
                     }%`,
                   }}
-                ></div>
+                />
 
               </div>
 
             </div>
+
+            {/* HIGH */}
 
             <div className="distribution-item high">
 
               <div className="distribution-top">
 
                 <span>
-                  🟠 High Risk
+                  🔴 High Risk
                 </span>
 
                 <strong>
@@ -742,42 +1257,14 @@ function Dashboard() {
                 <div
                   style={{
                     width: `${
-                      locations.length > 0
-                        ? (riskCounts.high / locations.length) * 100
+                      districts.length
+                        ? (riskCounts.high /
+                            districts.length) *
+                          100
                         : 0
                     }%`,
                   }}
-                ></div>
-
-              </div>
-
-            </div>
-
-            <div className="distribution-item critical">
-
-              <div className="distribution-top">
-
-                <span>
-                  🔴 Critical Risk
-                </span>
-
-                <strong>
-                  {riskCounts.critical}
-                </strong>
-
-              </div>
-
-              <div className="distribution-bar">
-
-                <div
-                  style={{
-                    width: `${
-                      locations.length > 0
-                        ? (riskCounts.critical / locations.length) * 100
-                        : 0
-                    }%`,
-                  }}
-                ></div>
+                />
 
               </div>
 
@@ -787,22 +1274,265 @@ function Dashboard() {
 
         </section>
 
-        {/* Bottom Cards */}
+        {/* ================= ALL DISTRICTS ================= */}
+
+        <section className="dashboard-card">
+
+          <div className="card-header">
+
+            <div>
+
+              <h2>
+                All NER Districts
+              </h2>
+
+              <p>
+                {districts.length} districts
+                monitored across 8 states
+              </p>
+
+            </div>
+
+            <button
+              onClick={() =>
+                navigate(
+                  "/risk-map"
+                )
+              }
+            >
+              Open Full Map →
+            </button>
+
+          </div>
+
+          <div
+            style={{
+              overflowX: "auto",
+              maxHeight: "500px",
+              overflowY: "auto",
+            }}
+          >
+
+            <table
+              style={{
+                width: "100%",
+                borderCollapse:
+                  "collapse",
+              }}
+            >
+
+              <thead>
+
+                <tr>
+
+                  <th
+                    style={{
+                      textAlign:
+                        "left",
+                      padding:
+                        "10px",
+                    }}
+                  >
+                    State
+                  </th>
+
+                  <th
+                    style={{
+                      textAlign:
+                        "left",
+                      padding:
+                        "10px",
+                    }}
+                  >
+                    District
+                  </th>
+
+                  <th
+                    style={{
+                      padding:
+                        "10px",
+                    }}
+                  >
+                    1-Day Rainfall
+                  </th>
+
+                  <th
+                    style={{
+                      padding:
+                        "10px",
+                    }}
+                  >
+                    7-Day Rainfall
+                  </th>
+
+                  <th
+                    style={{
+                      padding:
+                        "10px",
+                    }}
+                  >
+                    Risk
+                  </th>
+
+                  <th
+                    style={{
+                      padding:
+                        "10px",
+                    }}
+                  >
+                    Probability
+                  </th>
+
+                </tr>
+
+              </thead>
+
+              <tbody>
+
+                {districts.map(
+                  (district) => (
+
+                    <tr
+                      key={`${district.state}-${district.district}`}
+                      onClick={() => {
+
+                        setSelectedState(
+                          district.state
+                        );
+
+                        setSelectedDistrict(
+                          district.district
+                        );
+
+                        window.scrollTo({
+                          top: 0,
+                          behavior:
+                            "smooth",
+                        });
+
+                      }}
+                      style={{
+                        cursor:
+                          "pointer",
+                      }}
+                    >
+
+                      <td
+                        style={{
+                          padding:
+                            "10px",
+                        }}
+                      >
+                        {
+                          district.state
+                        }
+                      </td>
+
+                      <td
+                        style={{
+                          padding:
+                            "10px",
+                          fontWeight:
+                            600,
+                        }}
+                      >
+                        {
+                          district.district
+                        }
+                      </td>
+
+                      <td
+                        style={{
+                          textAlign:
+                            "center",
+                          padding:
+                            "10px",
+                        }}
+                      >
+                        {
+                          district.rainfall_1d_mm
+                        }{" "}
+                        mm
+                      </td>
+
+                      <td
+                        style={{
+                          textAlign:
+                            "center",
+                          padding:
+                            "10px",
+                        }}
+                      >
+                        {
+                          district.rainfall_7d_mm
+                        }{" "}
+                        mm
+                      </td>
+
+                      <td
+                        style={{
+                          textAlign:
+                            "center",
+                          padding:
+                            "10px",
+                        }}
+                      >
+
+                        {district.risk_level ===
+                        "HIGH"
+                          ? "🔴 HIGH"
+                          : district.risk_level ===
+                            "MEDIUM"
+                          ? "🟡 MEDIUM"
+                          : "🟢 LOW"}
+
+                      </td>
+
+                      <td
+                        style={{
+                          textAlign:
+                            "center",
+                          padding:
+                            "10px",
+                        }}
+                      >
+                        {
+                          district.risk_probability
+                        }%
+                      </td>
+
+                    </tr>
+
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </section>
+
+        {/* ================= ENVIRONMENT ================= */}
+
         <section className="dashboard-grid bottom-grid">
 
-          {/* Environmental Conditions */}
           <div className="dashboard-card">
 
             <div className="card-header">
 
               <div>
+
                 <h2>
                   Environmental Conditions
                 </h2>
 
                 <p>
-                  Current regional measurements
+                  Selected district
+                  measurements
                 </p>
+
               </div>
 
             </div>
@@ -812,17 +1542,17 @@ function Dashboard() {
               <div>
 
                 <span>
-                  🌧️ Rainfall
+                  🌧️ 15-Day Rainfall
                 </span>
 
                 <strong>
-                  {selectedLocation
-                    ? `${selectedLocation.rainfall_mm} mm`
-                    : "Loading..."}
+                  {currentDistrict
+                    ? `${currentDistrict.rainfall_15d_mm} mm`
+                    : "--"}
                 </strong>
 
                 <small>
-                  Last 24 hours
+                  IMD rainfall dataset
                 </small>
 
               </div>
@@ -834,13 +1564,13 @@ function Dashboard() {
                 </span>
 
                 <strong>
-                  {selectedLocation
-                    ? `${selectedLocation.temperature_c}°C`
-                    : "Loading..."}
+                  {currentDistrict
+                    ? `${currentDistrict.temperature}°C`
+                    : "--"}
                 </strong>
 
                 <small>
-                  Current
+                  Monitoring value
                 </small>
 
               </div>
@@ -852,13 +1582,13 @@ function Dashboard() {
                 </span>
 
                 <strong>
-                  {selectedLocation
-                    ? `${selectedLocation.soil_moisture}%`
-                    : "Loading..."}
+                  {currentDistrict
+                    ? currentDistrict.soil_moisture
+                    : "--"}
                 </strong>
 
                 <small>
-                  Current
+                  Model input
                 </small>
 
               </div>
@@ -870,13 +1600,13 @@ function Dashboard() {
                 </span>
 
                 <strong>
-                  {selectedLocation
-                    ? `${selectedLocation.elevation_m} m`
-                    : "Loading..."}
+                  {currentDistrict
+                    ? `${currentDistrict.elevation} m`
+                    : "--"}
                 </strong>
 
                 <small>
-                  Above sea level
+                  Model input
                 </small>
 
               </div>
@@ -885,12 +1615,14 @@ function Dashboard() {
 
           </div>
 
-          {/* Quick Actions */}
+          {/* QUICK ACTIONS */}
+
           <div className="dashboard-card quick-actions">
 
             <div className="card-header">
 
               <div>
+
                 <h2>
                   Quick Actions
                 </h2>
@@ -898,41 +1630,67 @@ function Dashboard() {
                 <p>
                   Common monitoring tasks
                 </p>
+
               </div>
 
             </div>
 
             <button
-              onClick={() => navigate("/prediction")}
+              onClick={() =>
+                navigate(
+                  "/prediction"
+                )
+              }
             >
               🤖 Run AI Prediction
             </button>
 
             <button
-              onClick={() => navigate("/risk-map")}
+              onClick={() =>
+                navigate(
+                  "/risk-map"
+                )
+              }
             >
               🗺️ Open Risk Map
             </button>
 
             <button
-              onClick={() => navigate("/alerts")}
+              onClick={() =>
+                navigate(
+                  "/alerts"
+                )
+              }
             >
               ⚠️ View Alerts
+            </button>
+
+            <button
+              onClick={() =>
+                navigate(
+                  "/report-landslide"
+                )
+              }
+            >
+              📸 Report a Landslide
             </button>
 
           </div>
 
         </section>
 
-        {/* Footer */}
+        {/* ================= FOOTER ================= */}
+
         <footer className="dashboard-footer">
 
           <span>
-            LandslideAI • SIH26001 Prototype
+            LandslideAI • SIH26001
+            Prototype
           </span>
 
           <span>
-            Predict. Monitor. Explain. Protect.
+            Predict. Monitor. Explain.
+            Protect.
           </span>
 
         </footer>
