@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Scenario.css";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://landslide-ai-backend.onrender.com";
 
 interface ScenarioResult {
   risk_score: number;
