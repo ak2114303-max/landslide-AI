@@ -88,7 +88,7 @@ function ReportLandslide() {
 
       // IMPORTANT: Plain URL, not Markdown link
       const response = await axios.post(
-  "http://127.0.0.1:8000/api/landslide-report",
+  "https://landslide-ai-backend.onrender.com/api/landslide-report",
   formData,
   {
     timeout: 10000,
